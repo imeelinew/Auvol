@@ -1,5 +1,6 @@
 # Build outputs
 mac/build/
+mac/.build/
 mac/Auvol.app/
 windows/Auvol.exe
 
