@@ -1,0 +1,316 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		3BD0BD0AD7D750EBD7E93BF4 /* ReceiverEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6833A9BAD43D712DCD5AFF0B /* ReceiverEngine.swift */; };
+		753AF5C00AC47DCA52011428 /* AudioPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 693C245EAE0EB2F9B5B5A327 /* AudioPlayer.swift */; };
+		80E033D97D17CB0969011B6D /* StatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC4D22BBDDD4CB58C502FC1A /* StatusView.swift */; };
+		CB8159FCAD9C52EE038CC18F /* RingBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E801F13CB05BFD33875316CA /* RingBuffer.swift */; };
+		CBAEFF17052D3CDD41A44656 /* NetworkReceiver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B252C4A09639EDD9CD76163 /* NetworkReceiver.swift */; };
+		F3F4219AA07EADFC281A83AA /* Protocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49C17C025BD4D7601298E8AD /* Protocol.swift */; };
+		F44513EC89AF511DE3EB7F1A /* AuvolApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA12E08C31F6C24A1D730037 /* AuvolApp.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		06C0F94AF7B3B427FFDE9EE2 /* Auvol.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Auvol.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		0B252C4A09639EDD9CD76163 /* NetworkReceiver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkReceiver.swift; sourceTree = "<group>"; };
+		49C17C025BD4D7601298E8AD /* Protocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Protocol.swift; sourceTree = "<group>"; };
+		6833A9BAD43D712DCD5AFF0B /* ReceiverEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiverEngine.swift; sourceTree = "<group>"; };
+		693C245EAE0EB2F9B5B5A327 /* AudioPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlayer.swift; sourceTree = "<group>"; };
+		AC4D22BBDDD4CB58C502FC1A /* StatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusView.swift; sourceTree = "<group>"; };
+		DA12E08C31F6C24A1D730037 /* AuvolApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuvolApp.swift; sourceTree = "<group>"; };
+		E801F13CB05BFD33875316CA /* RingBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RingBuffer.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		2D186D185FD3048755E1557D /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				06C0F94AF7B3B427FFDE9EE2 /* Auvol.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		7C5851E9A99E6C0D675A3789 = {
+			isa = PBXGroup;
+			children = (
+				F31C1E99723C080DC97CFD30 /* Auvol */,
+				2D186D185FD3048755E1557D /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		F31C1E99723C080DC97CFD30 /* Auvol */ = {
+			isa = PBXGroup;
+			children = (
+				693C245EAE0EB2F9B5B5A327 /* AudioPlayer.swift */,
+				DA12E08C31F6C24A1D730037 /* AuvolApp.swift */,
+				0B252C4A09639EDD9CD76163 /* NetworkReceiver.swift */,
+				49C17C025BD4D7601298E8AD /* Protocol.swift */,
+				6833A9BAD43D712DCD5AFF0B /* ReceiverEngine.swift */,
+				E801F13CB05BFD33875316CA /* RingBuffer.swift */,
+				AC4D22BBDDD4CB58C502FC1A /* StatusView.swift */,
+			);
+			path = Auvol;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		9E2BDD4CE3F4E72873B0BA94 /* Auvol */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B5F48412CB268F30EFA53C5D /* Build configuration list for PBXNativeTarget "Auvol" */;
+			buildPhases = (
+				FAE62F726C1DC825DF5E10D9 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Auvol;
+			packageProductDependencies = (
+			);
+			productName = Auvol;
+			productReference = 06C0F94AF7B3B427FFDE9EE2 /* Auvol.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		3C20BB07AF99171F5A83F059 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					9E2BDD4CE3F4E72873B0BA94 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = BA7DA3EB65F785BE29141BBF /* Build configuration list for PBXProject "Auvol" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 7C5851E9A99E6C0D675A3789;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 2D186D185FD3048755E1557D /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				9E2BDD4CE3F4E72873B0BA94 /* Auvol */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		FAE62F726C1DC825DF5E10D9 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				753AF5C00AC47DCA52011428 /* AudioPlayer.swift in Sources */,
+				F44513EC89AF511DE3EB7F1A /* AuvolApp.swift in Sources */,
+				CBAEFF17052D3CDD41A44656 /* NetworkReceiver.swift in Sources */,
+				F3F4219AA07EADFC281A83AA /* Protocol.swift in Sources */,
+				3BD0BD0AD7D750EBD7E93BF4 /* ReceiverEngine.swift in Sources */,
+				CB8159FCAD9C52EE038CC18F /* RingBuffer.swift in Sources */,
+				80E033D97D17CB0969011B6D /* StatusView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		2824D1941E1F0BD904CF8F19 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = Auvol/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		90B562B3D788C430A16F45D9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.eli.Auvol;
+				PRODUCT_NAME = Auvol;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+		92CF23E8BE088035CC8C20A9 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = Auvol/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		9399AC6D276442C054B19ECF /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.eli.Auvol;
+				PRODUCT_NAME = Auvol;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		B5F48412CB268F30EFA53C5D /* Build configuration list for PBXNativeTarget "Auvol" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2824D1941E1F0BD904CF8F19 /* Debug */,
+				92CF23E8BE088035CC8C20A9 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		BA7DA3EB65F785BE29141BBF /* Build configuration list for PBXProject "Auvol" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				90B562B3D788C430A16F45D9 /* Debug */,
+				9399AC6D276442C054B19ECF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 3C20BB07AF99171F5A83F059 /* Project object */;
+}

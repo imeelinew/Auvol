@@ -1,0 +1,11 @@
+# Build outputs
+mac/build/
+mac/Auvol.app/
+windows/Auvol.exe
+
+# Xcode user data
+mac/Auvol.xcodeproj/xcuserdata/
+*.xcuserstate
+
+# macOS
+.DS_Store
