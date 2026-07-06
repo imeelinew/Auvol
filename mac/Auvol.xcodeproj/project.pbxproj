@@ -10,6 +10,7 @@
 		3BD0BD0AD7D750EBD7E93BF4 /* ReceiverEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6833A9BAD43D712DCD5AFF0B /* ReceiverEngine.swift */; };
 		753AF5C00AC47DCA52011428 /* AudioPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 693C245EAE0EB2F9B5B5A327 /* AudioPlayer.swift */; };
 		80E033D97D17CB0969011B6D /* StatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC4D22BBDDD4CB58C502FC1A /* StatusView.swift */; };
+		C192A35282280B2528EA5E49 /* Auvol.icon in Resources */ = {isa = PBXBuildFile; fileRef = 4BF7B13D14D2F171F15418B7 /* Auvol.icon */; };
 		CB8159FCAD9C52EE038CC18F /* RingBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E801F13CB05BFD33875316CA /* RingBuffer.swift */; };
 		CBAEFF17052D3CDD41A44656 /* NetworkReceiver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B252C4A09639EDD9CD76163 /* NetworkReceiver.swift */; };
 		F3F4219AA07EADFC281A83AA /* Protocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49C17C025BD4D7601298E8AD /* Protocol.swift */; };
@@ -20,6 +21,7 @@
 		06C0F94AF7B3B427FFDE9EE2 /* Auvol.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Auvol.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		0B252C4A09639EDD9CD76163 /* NetworkReceiver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkReceiver.swift; sourceTree = "<group>"; };
 		49C17C025BD4D7601298E8AD /* Protocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Protocol.swift; sourceTree = "<group>"; };
+		4BF7B13D14D2F171F15418B7 /* Auvol.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = Auvol.icon; sourceTree = "<group>"; };
 		6833A9BAD43D712DCD5AFF0B /* ReceiverEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiverEngine.swift; sourceTree = "<group>"; };
 		693C245EAE0EB2F9B5B5A327 /* AudioPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlayer.swift; sourceTree = "<group>"; };
 		AC4D22BBDDD4CB58C502FC1A /* StatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusView.swift; sourceTree = "<group>"; };
@@ -39,6 +41,7 @@
 		7C5851E9A99E6C0D675A3789 = {
 			isa = PBXGroup;
 			children = (
+				4BF7B13D14D2F171F15418B7 /* Auvol.icon */,
 				F31C1E99723C080DC97CFD30 /* Auvol */,
 				2D186D185FD3048755E1557D /* Products */,
 			);
@@ -66,6 +69,7 @@
 			buildConfigurationList = B5F48412CB268F30EFA53C5D /* Build configuration list for PBXNativeTarget "Auvol" */;
 			buildPhases = (
 				FAE62F726C1DC825DF5E10D9 /* Sources */,
+				C3E62D0223C882B991793FB3 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -112,6 +116,17 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		C3E62D0223C882B991793FB3 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C192A35282280B2528EA5E49 /* Auvol.icon in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		FAE62F726C1DC825DF5E10D9 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -133,7 +148,7 @@
 		2824D1941E1F0BD904CF8F19 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = Auvol;
 				COMBINE_HIDPI_IMAGES = YES;
 				INFOPLIST_FILE = Auvol/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -216,7 +231,7 @@
 		92CF23E8BE088035CC8C20A9 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = Auvol;
 				COMBINE_HIDPI_IMAGES = YES;
 				INFOPLIST_FILE = Auvol/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

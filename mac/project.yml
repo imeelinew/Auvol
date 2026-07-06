@@ -4,6 +4,9 @@ options:
   deploymentTarget:
     macOS: "13.0"
   createIntermediateGroups: true
+  fileTypes:
+    icon:
+      file: true
 
 settings:
   base:
@@ -24,13 +27,17 @@ targets:
       - path: Auvol
         excludes:
           - "Info.plist"
-    resources:
-      - path: Assets.xcassets
+      - path: Auvol.icon
+        buildPhase: resources
+    settings:
+      base:
+        ASSETCATALOG_COMPILER_APPICON_NAME: Auvol
     info:
       path: Auvol/Info.plist
       properties:
         CFBundleName: Auvol
         CFBundleDisplayName: Auvol
+        CFBundleIconName: Auvol
         CFBundleExecutable: $(EXECUTABLE_NAME)
         CFBundleIdentifier: $(PRODUCT_BUNDLE_IDENTIFIER)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)

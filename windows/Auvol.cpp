@@ -1,6 +1,7 @@
 // Auvol — Windows audio sender
 // WASAPI loopback (default render device) -> UDP float32 PCM -> Mac receiver
-// Build: x86_64-w64-mingw32-g++ -std=c++17 -O2 -static -o Auvol.exe auvol.cpp \
+// Build: x86_64-w64-mingw32-windres -i Auvol.rc -o Auvol_rc.o && \
+//        x86_64-w64-mingw32-g++ -std=c++17 -O2 -static -o Auvol.exe Auvol.cpp Auvol_rc.o \
 //          -lole32 -lws2_32 -lksuser -lgdi32 -lcomctl32 -luxtheme -mwindows
 
 #include <winsock2.h>
@@ -9,6 +10,8 @@
 #include <commctrl.h>
 #include <mmdeviceapi.h>
 #include <audioclient.h>
+
+#include "resource.h"
 
 #include <thread>
 #include <atomic>
@@ -320,13 +323,17 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
 int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int show) {
     InitCommonControls();
 
-    WNDCLASSW wc = {};
+    WNDCLASSEXW wc = {};
+    wc.cbSize = sizeof(wc);
     wc.lpfnWndProc = WndProc;
     wc.hInstance = hInst;
+    wc.hIcon = (HICON)LoadImageW(hInst, MAKEINTRESOURCEW(IDI_APP_ICON), IMAGE_ICON, 0, 0, LR_DEFAULTSIZE);
+    wc.hIconSm = (HICON)LoadImageW(hInst, MAKEINTRESOURCEW(IDI_APP_ICON), IMAGE_ICON,
+                                   GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), 0);
     wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
     wc.lpszClassName = L"AuvolMain";
-    RegisterClassW(&wc);
+    RegisterClassExW(&wc);
 
     hMain = CreateWindowExW(0, L"AuvolMain", L"Auvol — Audio Sender",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,

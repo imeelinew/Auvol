@@ -3,6 +3,7 @@ mac/build/
 mac/.build/
 mac/Auvol.app/
 windows/Auvol.exe
+windows/Auvol_rc.o
 
 # Xcode user data
 mac/Auvol.xcodeproj/xcuserdata/
