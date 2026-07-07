@@ -11,9 +11,10 @@ final class ReceiverEngine: ObservableObject {
     @Published var totalPackets: Int = 0
     @Published var underruns: Int = 0
     @Published var overflows: Int = 0
+    @Published var lostPackets: Int = 0
     @Published var packetRate: Int = 0
     @Published var gapFrameRate: Int = 0
-    @Published var targetBufferMs: Int = 150
+    @Published var targetBufferMs: Int = 80
     @Published var port: UInt16 = 7777
     @Published var senderIP: String = ""
 
@@ -24,6 +25,9 @@ final class ReceiverEngine: ObservableObject {
     private var lastStatsPacketCount = 0
     private var lastStatsUnderruns = 0
     private var lastStatsTime = Date()
+    private var frameSize: UInt32 = 120
+    private var lastSeq: UInt32?
+    private var haveSeq = false
 
     init() {
         DispatchQueue.main.async { [weak self] in self?.start() }
@@ -36,7 +40,9 @@ final class ReceiverEngine: ObservableObject {
 
         let net = NetworkReceiver(port: port)
         net.onConfig = { [weak self] cfg in self?.applyConfig(cfg) }
-        net.onAudio = { [weak self] data, frames in self?.handleAudio(data: data, frames: frames) }
+        net.onAudio = { [weak self] seq, data, frames in
+            self?.handleAudio(seq: seq, data: data, frames: frames)
+        }
         net.onSenderSeen = { [weak self] ip in
             DispatchQueue.main.async { self?.senderIP = ip }
         }
@@ -60,14 +66,31 @@ final class ReceiverEngine: ObservableObject {
 
     private func applyConfig(_ cfg: AudioConfig) {
         network?.setChannels(cfg.channels)
+        frameSize = cfg.frameSize
         player?.configure(sampleRate: cfg.sampleRate, channels: cfg.channels, frameSize: cfg.frameSize)
+        lastSeq = nil
+        haveSeq = false
         DispatchQueue.main.async { [weak self] in
             self?.sampleRate = cfg.sampleRate
             self?.channels = Int(cfg.channels)
         }
     }
 
-    private func handleAudio(data: UnsafePointer<Float>, frames: Int) {
+    private func handleAudio(seq: UInt32, data: UnsafePointer<Float>, frames: Int) {
+        if haveSeq, let prev = lastSeq {
+            let expected = prev &+ 1
+            if seq != expected {
+                let gap = Int(seq &- expected)
+                if gap > 0 && gap < 500 {
+                    lostPackets += gap
+                    player?.pushConcealment(frames: gap * Int(frameSize))
+                }
+            }
+        } else {
+            haveSeq = true
+        }
+        lastSeq = seq
+
         player?.push(data, frames: frames)
         packetCount += 1
     }

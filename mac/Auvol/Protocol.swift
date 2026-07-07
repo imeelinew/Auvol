@@ -14,7 +14,7 @@ struct AudioConfig: Equatable {
 
 enum Packet {
     case config(AudioConfig)
-    case audio(payloadOffset: Int, payloadFloats: Int)
+    case audio(seq: UInt32, payloadOffset: Int, payloadFloats: Int)
 }
 
 enum PacketParser {
@@ -33,7 +33,7 @@ enum PacketParser {
         case ALV1.typeAudio:
             guard length >= 20 else { return nil }
             let floats = (length - 20) / MemoryLayout<Float>.size
-            return .audio(payloadOffset: 20, payloadFloats: floats)
+            return .audio(seq: le32(buf, 8), payloadOffset: 20, payloadFloats: floats)
         default:
             return nil
         }

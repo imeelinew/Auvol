@@ -188,6 +188,7 @@ static void AudioThread(const std::string& targetIp, UINT16 port) {
 
         std::vector<float> stage;
         stage.reserve(FRAME_FRAMES * 2 * 8);
+        float lastCh[2] = {0.0f, 0.0f};
         const size_t payloadFloats = (size_t)FRAME_FRAMES * 2;
         const size_t payloadBytes  = payloadFloats * 4;
         std::vector<UINT8> audioPkt(20 + payloadBytes);
@@ -210,10 +211,16 @@ static void AudioThread(const std::string& targetIp, UINT16 port) {
                 if (FAILED(hr)) break;
                 if (frames > 0) {
                     if (flags & AUDCLNT_BUFFERFLAGS_SILENT) {
-                        stage.insert(stage.end(), (size_t)frames * 2, 0.0f);
+                        // loopback 偶发误报 SILENT；硬插零会造成波形突变。
+                        for (UINT32 i = 0; i < frames; ++i) {
+                            stage.push_back(lastCh[0]);
+                            stage.push_back(lastCh[1]);
+                        }
                     } else if (data) {
                         const float* src = (const float*)data;
                         stage.insert(stage.end(), src, src + (size_t)frames * 2);
+                        lastCh[0] = src[(size_t)frames * 2 - 2];
+                        lastCh[1] = src[(size_t)frames * 2 - 1];
                     }
                 }
                 capture->ReleaseBuffer(frames);

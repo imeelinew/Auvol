@@ -11,7 +11,7 @@ final class NetworkReceiver {
     private var channels: UInt32 = 2
 
     var onConfig: ((AudioConfig) -> Void)?
-    var onAudio: ((UnsafePointer<Float>, Int) -> Void)?
+    var onAudio: ((UInt32, UnsafePointer<Float>, Int) -> Void)?
     var onSenderSeen: ((String) -> Void)?
 
     init(port: UInt16) {
@@ -74,12 +74,12 @@ final class NetworkReceiver {
             switch pkt {
             case .config(let cfg):
                 onConfig?(cfg)
-            case .audio(let offset, let floats):
+            case .audio(let seq, let offset, let floats):
                 guard floats > 0 else { continue }
                 buf.withUnsafeMutableBytes { raw in
                     guard let base = raw.baseAddress else { return }
                     let payload = base.advanced(by: offset).assumingMemoryBound(to: Float.self)
-                    onAudio?(payload, floats / Int(channels))
+                    onAudio?(seq, payload, floats / Int(channels))
                 }
             }
         }

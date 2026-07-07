@@ -64,11 +64,12 @@ struct StatusView: View {
             statRow("Packets", "\(engine.totalPackets) (\(engine.packetRate)/s)")
             statRow("Starved frames", "\(engine.underruns) (\(engine.gapFrameRate)/s)")
             statRow("Overflows", "\(engine.overflows)")
+            statRow("Lost pkts", "\(engine.lostPackets)")
         }
     }
 
     private var statsHint: some View {
-        Text("Packets ≈400/s 正常。Buffer 应接近 Target；Starved/s 应接近 0。Mac 端自适应调节播放速率吸收时钟漂移。")
+        Text("爆音常见原因：UDP 丢包(Lost pkts)或持续 resample。Buffer/Target 只影响延迟。")
             .font(.caption2)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
@@ -95,7 +96,7 @@ struct StatusView: View {
                     get: { Double(engine.targetBufferMs) },
                     set: { engine.targetBufferMs = Int($0) }
                 ),
-                in: 100...500, step: 10
+                in: 40...200, step: 5
             )
         }
     }

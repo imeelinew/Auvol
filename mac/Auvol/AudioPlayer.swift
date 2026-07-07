@@ -2,7 +2,7 @@ import Foundation
 import AVFoundation
 
 /// 用 AVAudioEngine + AVAudioSourceNode 从 ring buffer 拉取音频。
-/// 自适应 jitter buffer：根据缓冲水位动态调节消费速率，吸收双端时钟漂移。
+/// 正常路径 1:1 直通；仅在真正缺帧时 stretch，避免持续 resample 引入杂音。
 final class AudioPlayer {
     private let engine = AVAudioEngine()
     private var sourceNode: AVAudioSourceNode?
@@ -15,10 +15,8 @@ final class AudioPlayer {
     private var channelCount = 2
     private var lastSample: [Float] = [0, 0]
     private var wasStarved = false
-    /// 缓冲水位 EMA（1.0 = 达到 targetBufferMs）
-    private var bufferFillEma = 1.0
 
-    var targetBufferMs: Int = 150
+    var targetBufferMs: Int = 80
     private(set) var underruns = 0
     private(set) var overflows = 0
 
@@ -38,7 +36,6 @@ final class AudioPlayer {
         channelCount = Int(channels)
         lastSample = Array(repeating: 0, count: channelCount)
         wasStarved = false
-        bufferFillEma = 1.0
 
         teardownLocked()
 
@@ -74,6 +71,26 @@ final class AudioPlayer {
         if needStart { maybeStart() }
     }
 
+    /// UDP 丢包时用上一帧样本填充 gap，避免波形硬断。
+    func pushConcealment(frames: Int) {
+        guard frames > 0 else { return }
+        lock.lock()
+        let samples = lastSample
+        let ch = channelCount
+        lock.unlock()
+
+        var buf = [Float](repeating: 0, count: frames * ch)
+        for i in 0..<frames {
+            for c in 0..<ch where c < samples.count {
+                buf[i * ch + c] = samples[c]
+            }
+        }
+        buf.withUnsafeBufferPointer { ptr in
+            guard let base = ptr.baseAddress else { return }
+            push(base, frames: frames)
+        }
+    }
+
     private func targetFrames() -> Int {
         guard let fmt = format else { return 0 }
         return Int(fmt.sampleRate * Double(targetBufferMs) / 1000.0)
@@ -83,37 +100,22 @@ final class AudioPlayer {
         let target = targetFrames()
         guard target > 0 else { return }
         let avail = r.availableFrames
-        if avail > target * 5 / 2 {
-            r.discard(frames: avail - target * 6 / 5)
+        if avail > target * 2 {
+            r.discard(frames: avail - target)
         }
     }
 
     private func maybeStart() {
         lock.lock(); defer { lock.unlock() }
         guard !running, !primed, let r = ring, sourceNode != nil else { return }
-
         guard r.availableFrames >= targetFrames() else { return }
 
         do {
             try engine.start()
             running = true
             primed = true
-            bufferFillEma = Double(r.availableFrames) / Double(max(targetFrames(), 1))
         } catch {
             running = false
-        }
-    }
-
-    /// 根据缓冲水位决定相对硬件时钟的消费速率。
-    private func playbackRate(for fill: Double) -> Double {
-        switch fill {
-        case ..<0.15:  return 0.88
-        case ..<0.35:  return 0.94
-        case ..<0.60:  return 0.98
-        case ..<0.85:  return 0.995
-        case ..<1.20:  return 1.0
-        case ..<1.60:  return 1.015
-        default:       return 1.03
         }
     }
 
@@ -122,30 +124,27 @@ final class AudioPlayer {
         let buffers = UnsafeMutableAudioBufferListPointer(abl)
         guard buffers.count >= ch else { return noErr }
 
-        let target = targetFrames()
         let avail = r.availableFrames
-        let fill = Double(avail) / Double(max(target, 1))
-        bufferFillEma = bufferFillEma * 0.92 + min(fill, 4.0) * 0.08
-
-        let rate = playbackRate(for: bufferFillEma)
-        let wantRead = max(1, Int((Double(frames) * rate).rounded()))
-        let toRead = min(avail, wantRead)
         var temp = [Float](repeating: 0, count: frames * ch)
 
-        if toRead > 0 {
-            var src = [Float](repeating: 0, count: toRead * ch)
+        if avail >= frames {
+            let read = temp.withUnsafeMutableBufferPointer { ptr in
+                r.read(into: ptr.baseAddress!, frames: frames)
+            }
+            if read < frames {
+                stretchPartialRead(into: &temp, read: read, frames: frames, ch: ch)
+            }
+        } else if avail > 0 {
+            var src = [Float](repeating: 0, count: avail * ch)
             let read = src.withUnsafeMutableBufferPointer { ptr in
-                r.read(into: ptr.baseAddress!, frames: toRead)
+                r.read(into: ptr.baseAddress!, frames: avail)
             }
             if read > 0 {
-                if read > frames {
-                    compress(into: &temp, src: src, srcFrames: read, dstFrames: frames, ch: ch)
-                } else if read < frames {
-                    stretch(into: &temp, src: src, srcFrames: read, dstFrames: frames, ch: ch)
-                } else {
-                    for i in 0..<frames * ch { temp[i] = src[i] }
-                }
+                stretch(into: &temp, src: src, srcFrames: read, dstFrames: frames, ch: ch)
             }
+            lock.lock()
+            underruns += frames - read
+            lock.unlock()
         } else {
             lock.lock()
             underruns += frames
@@ -158,7 +157,7 @@ final class AudioPlayer {
             wasStarved = true
         }
 
-        if toRead > 0 && wasStarved {
+        if avail > 0 && wasStarved {
             let fade = min(32, frames)
             for i in 0..<fade {
                 let t = Float(i + 1) / Float(fade)
@@ -183,6 +182,18 @@ final class AudioPlayer {
         return noErr
     }
 
+    private func stretchPartialRead(into temp: inout [Float], read: Int, frames: Int, ch: Int) {
+        lock.lock()
+        underruns += frames - read
+        lock.unlock()
+        let base = max(0, read - 1) * ch
+        for i in read..<frames {
+            for c in 0..<ch {
+                temp[i * ch + c] = read > 0 ? temp[base + c] : lastSample[c]
+            }
+        }
+    }
+
     private func stretch(into dst: inout [Float], src: [Float], srcFrames: Int, dstFrames: Int, ch: Int) {
         guard srcFrames > 0, dstFrames > 0 else { return }
         if srcFrames == 1 || dstFrames == 1 {
@@ -194,28 +205,6 @@ final class AudioPlayer {
         let denom = max(dstFrames - 1, 1)
         for i in 0..<dstFrames {
             let pos = Double(i) * Double(srcFrames - 1) / Double(denom)
-            let idx = Int(pos)
-            let frac = Float(pos - Double(idx))
-            let idx2 = min(idx + 1, srcFrames - 1)
-            for c in 0..<ch {
-                let a = src[idx * ch + c]
-                let b = src[idx2 * ch + c]
-                dst[i * ch + c] = a + (b - a) * frac
-            }
-        }
-    }
-
-    private func compress(into dst: inout [Float], src: [Float], srcFrames: Int, dstFrames: Int, ch: Int) {
-        guard srcFrames > 0, dstFrames > 0 else { return }
-        if srcFrames == 1 || dstFrames == 1 {
-            for i in 0..<dstFrames {
-                for c in 0..<ch { dst[i * ch + c] = src[c] }
-            }
-            return
-        }
-        let denom = max(srcFrames - 1, 1)
-        for i in 0..<dstFrames {
-            let pos = Double(i) * Double(srcFrames - 1) / Double(max(dstFrames - 1, 1))
             let idx = Int(pos)
             let frac = Float(pos - Double(idx))
             let idx2 = min(idx + 1, srcFrames - 1)
@@ -239,7 +228,6 @@ final class AudioPlayer {
         primed = false
         lastSample = Array(repeating: 0, count: channelCount)
         wasStarved = false
-        bufferFillEma = 1.0
     }
 
     func stop() {

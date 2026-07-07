@@ -25,6 +25,14 @@ Windows 的 Realtek/Intel SST 驱动会在 WASAPI loopback 路径上降质音频
 
 ## 构建
 
+改完代码后一键编译并更新两端（Mac 接收端 + Windows 桌面 `Auvol.exe`）：
+
+```sh
+./deploy.sh
+```
+
+Windows 端需 **Disconnect → 重新 Connect** 才会用到新 exe。
+
 ### Mac 端（Xcode）
 ```sh
 cd mac
@@ -54,13 +62,13 @@ x86_64-w64-mingw32-g++ -std=c++17 -O2 \
 
 - 绿色圆点 = 正在播放接收到的音频
 - 橙色圆点 = 监听中，等待发送端
-- 可调目标缓冲（100–800ms）
+- 可调目标缓冲（40–200ms，默认 80ms）
 - 实时显示缓冲水位、包数、欠载、溢出
 
 ## 调参
 
-- **卡顿/爆音**：Mac 菜单栏滑大目标缓冲（300→500ms）
-- **延迟太大**：滑小（100→150ms），Wi-Fi 下不建议低于 100ms
+- **卡顿/爆音**：Mac 菜单栏滑大 Target buffer（80→120ms）
+- **延迟太大**：滑小（80→50ms）；Starved/s 升高说明已过低
 
 ## 限制
 
