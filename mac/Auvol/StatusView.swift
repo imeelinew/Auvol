@@ -9,6 +9,7 @@ struct StatusView: View {
             statusText
             Divider()
             statsGrid
+            statsHint
             Divider()
             bufferControl
             Divider()
@@ -59,11 +60,18 @@ struct StatusView: View {
 
     private var statsGrid: some View {
         VStack(spacing: 6) {
-            statRow("Buffer", String(format: "%.0f ms", engine.bufferLevelMs))
-            statRow("Packets", "\(engine.totalPackets)")
-            statRow("Underruns", "\(engine.underruns)")
+            statRow("Buffer", String(format: "%.0f / %d ms", engine.bufferLevelMs, engine.targetBufferMs))
+            statRow("Packets", "\(engine.totalPackets) (\(engine.packetRate)/s)")
+            statRow("Starved frames", "\(engine.underruns) (\(engine.gapFrameRate)/s)")
             statRow("Overflows", "\(engine.overflows)")
         }
+    }
+
+    private var statsHint: some View {
+        Text("Packets ≈400/s 正常。Buffer 应接近 Target；Starved/s 应接近 0。Mac 端自适应调节播放速率吸收时钟漂移。")
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private func statRow(_ label: String, _ value: String) -> some View {
@@ -87,7 +95,7 @@ struct StatusView: View {
                     get: { Double(engine.targetBufferMs) },
                     set: { engine.targetBufferMs = Int($0) }
                 ),
-                in: 100...800, step: 50
+                in: 100...500, step: 10
             )
         }
     }

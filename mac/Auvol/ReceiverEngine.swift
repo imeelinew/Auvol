@@ -11,7 +11,9 @@ final class ReceiverEngine: ObservableObject {
     @Published var totalPackets: Int = 0
     @Published var underruns: Int = 0
     @Published var overflows: Int = 0
-    @Published var targetBufferMs: Int = 300
+    @Published var packetRate: Int = 0
+    @Published var gapFrameRate: Int = 0
+    @Published var targetBufferMs: Int = 150
     @Published var port: UInt16 = 7777
     @Published var senderIP: String = ""
 
@@ -19,6 +21,9 @@ final class ReceiverEngine: ObservableObject {
     private var player: AudioPlayer?
     private var statsTimer: Timer?
     private var packetCount = 0
+    private var lastStatsPacketCount = 0
+    private var lastStatsUnderruns = 0
+    private var lastStatsTime = Date()
 
     init() {
         DispatchQueue.main.async { [weak self] in self?.start() }
@@ -39,6 +44,7 @@ final class ReceiverEngine: ObservableObject {
         network = net
         isListening = true
 
+        lastStatsTime = Date()
         statsTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             self?.updateStats()
         }
@@ -54,7 +60,7 @@ final class ReceiverEngine: ObservableObject {
 
     private func applyConfig(_ cfg: AudioConfig) {
         network?.setChannels(cfg.channels)
-        player?.configure(sampleRate: cfg.sampleRate, channels: cfg.channels)
+        player?.configure(sampleRate: cfg.sampleRate, channels: cfg.channels, frameSize: cfg.frameSize)
         DispatchQueue.main.async { [weak self] in
             self?.sampleRate = cfg.sampleRate
             self?.channels = Int(cfg.channels)
@@ -74,5 +80,15 @@ final class ReceiverEngine: ObservableObject {
         underruns = p.underruns
         overflows = p.overflows
         totalPackets = packetCount
+
+        let now = Date()
+        let dt = now.timeIntervalSince(lastStatsTime)
+        if dt >= 0.4 {
+            packetRate = Int(Double(packetCount - lastStatsPacketCount) / dt)
+            gapFrameRate = Int(Double(p.underruns - lastStatsUnderruns) / dt)
+            lastStatsPacketCount = packetCount
+            lastStatsUnderruns = p.underruns
+            lastStatsTime = now
+        }
     }
 }

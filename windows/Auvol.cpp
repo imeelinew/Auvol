@@ -84,6 +84,10 @@ static void AudioThread(const std::string& targetIp, UINT16 port) {
         WSACleanup();
         return;
     }
+    {
+        int sndbuf = 1 << 20;
+        setsockopt(sock, SOL_SOCKET, SO_SNDBUF, (const char*)&sndbuf, sizeof(sndbuf));
+    }
 
     sockaddr_in dst = {};
     dst.sin_family = AF_INET;
@@ -155,9 +159,13 @@ static void AudioThread(const std::string& targetIp, UINT16 port) {
         UpdateStatus(buf);
     }
 
+    REFERENCE_TIME devicePeriod = 0;
+    REFERENCE_TIME minPeriod = 0;
+    client->GetDevicePeriod(&devicePeriod, &minPeriod);
+    REFERENCE_TIME bufferDuration = minPeriod > 0 ? minPeriod : devicePeriod;
     hr = client->Initialize(AUDCLNT_SHAREMODE_SHARED,
                             AUDCLNT_STREAMFLAGS_LOOPBACK,
-                            10000000, 0, mixFmt, nullptr);
+                            bufferDuration, 0, mixFmt, nullptr);
     if (FAILED(hr)) { UpdateStatus("Initialize failed"); cleanup(); return; }
     hr = client->GetService(__uuidof(IAudioCaptureClient), (void**)&capture);
     if (FAILED(hr)) { UpdateStatus("GetService failed"); cleanup(); return; }
@@ -189,14 +197,8 @@ static void AudioThread(const std::string& targetIp, UINT16 port) {
         UINT32 seq = 0;
         auto lastCfg  = std::chrono::steady_clock::now();
         auto lastStat = lastCfg;
-        REFERENCE_TIME period = 100000;
-        client->GetDevicePeriod(&period, nullptr);
-        DWORD sleepMs = (DWORD)(period / 10000 / 2);
-        if (sleepMs == 0) sleepMs = 1;
 
         while (g_running.load()) {
-            Sleep(sleepMs);
-
             for (;;) {
                 UINT32 pktFrames = 0;
                 hr = capture->GetNextPacketSize(&pktFrames);
@@ -206,13 +208,18 @@ static void AudioThread(const std::string& targetIp, UINT16 port) {
                 DWORD flags = 0;
                 hr = capture->GetBuffer(&data, &frames, &flags, nullptr, nullptr);
                 if (FAILED(hr)) break;
-                if (frames > 0 && data) {
-                    const float* src = (const float*)data;
-                    stage.insert(stage.end(), src, src + (size_t)frames * 2);
+                if (frames > 0) {
+                    if (flags & AUDCLNT_BUFFERFLAGS_SILENT) {
+                        stage.insert(stage.end(), (size_t)frames * 2, 0.0f);
+                    } else if (data) {
+                        const float* src = (const float*)data;
+                        stage.insert(stage.end(), src, src + (size_t)frames * 2);
+                    }
                 }
                 capture->ReleaseBuffer(frames);
             }
 
+            // 捕获多少发多少；限速交给 Mac 端 jitter buffer，不用 Windows 墙钟。
             while (stage.size() >= payloadFloats) {
                 UINT64 ts = (UINT64)std::chrono::duration_cast<std::chrono::microseconds>(
                     std::chrono::steady_clock::now().time_since_epoch()).count();
@@ -225,6 +232,8 @@ static void AudioThread(const std::string& targetIp, UINT16 port) {
                 g_packetsSent.store(seq);
                 stage.erase(stage.begin(), stage.begin() + payloadFloats);
             }
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
             auto now = std::chrono::steady_clock::now();
             if (now - lastCfg > std::chrono::seconds(1)) {

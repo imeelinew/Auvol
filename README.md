@@ -25,17 +25,7 @@ Windows 的 Realtek/Intel SST 驱动会在 WASAPI loopback 路径上降质音频
 
 ## 构建
 
-### 一键构建（在 Mac 上同时产出两端）
-需要 Xcode + `xcodegen` + `mingw-w64`：
-```sh
-brew install xcodegen mingw-w64   # 仅首次
-./build.sh
-```
-产物：
-- `mac/Auvol.app` — Mac 原生菜单栏 app（arm64）
-- `windows/Auvol.exe` — Windows x86-64 GUI，静态链接，单文件可分发
-
-### Mac 端（通过 Xcode）
+### Mac 端（Xcode）
 ```sh
 cd mac
 xcodegen generate

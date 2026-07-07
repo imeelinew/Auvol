@@ -43,6 +43,16 @@ final class RingBuffer {
     }
 
     @discardableResult
+    func discard(frames: Int) -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        let avail = max(0, writePos - readPos)
+        let n = min(frames, avail)
+        readPos += n
+        return n
+    }
+
+    @discardableResult
     func read(into dst: UnsafeMutablePointer<Float>, frames: Int) -> Int {
         lock.lock()
         defer { lock.unlock() }
