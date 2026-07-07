@@ -1,8 +1,11 @@
 import Foundation
+import OSLog
 import SwiftUI
 
 /// 应用状态中枢：协调网络接收与音频播放，驱动 UI 更新。
 final class ReceiverEngine: ObservableObject {
+    private let logger = Logger(subsystem: "com.eli.Auvol", category: "stream")
+
     @Published var isListening = false
     @Published var isPlaying = false
     @Published var sampleRate: Double = 0
@@ -14,7 +17,6 @@ final class ReceiverEngine: ObservableObject {
     @Published var lostPackets: Int = 0
     @Published var packetRate: Int = 0
     @Published var gapFrameRate: Int = 0
-    @Published var targetBufferMs: Int = 80
     @Published var port: UInt16 = 7777
     @Published var senderIP: String = ""
 
@@ -25,9 +27,14 @@ final class ReceiverEngine: ObservableObject {
     private var lastStatsPacketCount = 0
     private var lastStatsUnderruns = 0
     private var lastStatsTime = Date()
+    private var lastLoggedUnderruns = 0
+    private var lastLoggedOverflows = 0
+    private var lastLoggedLostPackets = 0
+    private var lastAudioTime: Date?
     private var frameSize: UInt32 = 120
     private var lastSeq: UInt32?
     private var haveSeq = false
+    private var currentConfig: AudioConfig?
 
     init() {
         DispatchQueue.main.async { [weak self] in self?.start() }
@@ -35,7 +42,6 @@ final class ReceiverEngine: ObservableObject {
 
     func start() {
         let p = AudioPlayer()
-        p.targetBufferMs = targetBufferMs
         player = p
 
         let net = NetworkReceiver(port: port)
@@ -65,11 +71,15 @@ final class ReceiverEngine: ObservableObject {
     }
 
     private func applyConfig(_ cfg: AudioConfig) {
-        network?.setChannels(cfg.channels)
+        let configChanged = currentConfig != cfg
+        currentConfig = cfg
+        network?.setConfig(cfg)
         frameSize = cfg.frameSize
         player?.configure(sampleRate: cfg.sampleRate, channels: cfg.channels, frameSize: cfg.frameSize)
-        lastSeq = nil
-        haveSeq = false
+        if configChanged {
+            lastSeq = nil
+            haveSeq = false
+        }
         DispatchQueue.main.async { [weak self] in
             self?.sampleRate = cfg.sampleRate
             self?.channels = Int(cfg.channels)
@@ -77,6 +87,7 @@ final class ReceiverEngine: ObservableObject {
     }
 
     private func handleAudio(seq: UInt32, data: UnsafePointer<Float>, frames: Int) {
+        lastAudioTime = Date()
         if haveSeq, let prev = lastSeq {
             let expected = prev &+ 1
             if seq != expected {
@@ -97,14 +108,15 @@ final class ReceiverEngine: ObservableObject {
 
     private func updateStats() {
         guard let p = player else { return }
-        p.targetBufferMs = targetBufferMs
-        isPlaying = p.isPlaying
+        let now = Date()
+        let packetsBeforeStats = lastStatsPacketCount
+        let recentlyReceivedAudio = lastAudioTime.map { now.timeIntervalSince($0) < 1.0 } ?? false
+        isPlaying = p.isPlaying && recentlyReceivedAudio
         bufferLevelMs = p.bufferLevelMs
         underruns = p.underruns
         overflows = p.overflows
         totalPackets = packetCount
 
-        let now = Date()
         let dt = now.timeIntervalSince(lastStatsTime)
         if dt >= 0.4 {
             packetRate = Int(Double(packetCount - lastStatsPacketCount) / dt)
@@ -112,6 +124,14 @@ final class ReceiverEngine: ObservableObject {
             lastStatsPacketCount = packetCount
             lastStatsUnderruns = p.underruns
             lastStatsTime = now
+        }
+
+        let receivedPacketsThisInterval = packetCount > packetsBeforeStats
+        if recentlyReceivedAudio && receivedPacketsThisInterval && (p.underruns != lastLoggedUnderruns || p.overflows != lastLoggedOverflows || lostPackets != lastLoggedLostPackets) {
+            logger.warning("stream anomaly packets=\(self.packetCount) underruns=\(p.underruns) overflows=\(p.overflows) lost=\(self.lostPackets) bufferMs=\(p.bufferLevelMs, privacy: .public)")
+            lastLoggedUnderruns = p.underruns
+            lastLoggedOverflows = p.overflows
+            lastLoggedLostPackets = lostPackets
         }
     }
 }

@@ -9,6 +9,7 @@ final class NetworkReceiver {
     private var bonjour: NetService?
     private let port: UInt16
     private var channels: UInt32 = 2
+    private var frameSize: UInt32 = 120
 
     var onConfig: ((AudioConfig) -> Void)?
     var onAudio: ((UInt32, UnsafePointer<Float>, Int) -> Void)?
@@ -51,7 +52,10 @@ final class NetworkReceiver {
         if sock >= 0 { close(sock); sock = -1 }
     }
 
-    func setChannels(_ ch: UInt32) { channels = ch }
+    func setConfig(_ cfg: AudioConfig) {
+        channels = cfg.channels
+        frameSize = cfg.frameSize
+    }
 
     private func receiveLoop() {
         var buf = [UInt8](repeating: 0, count: 4096)
@@ -75,7 +79,8 @@ final class NetworkReceiver {
             case .config(let cfg):
                 onConfig?(cfg)
             case .audio(let seq, let offset, let floats):
-                guard floats > 0 else { continue }
+                let expectedFloats = Int(channels * frameSize)
+                guard floats == expectedFloats else { continue }
                 buf.withUnsafeMutableBytes { raw in
                     guard let base = raw.baseAddress else { return }
                     let payload = base.advanced(by: offset).assumingMemoryBound(to: Float.self)

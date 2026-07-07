@@ -27,7 +27,6 @@ scp -o ConnectTimeout=20 "$ROOT/windows/Auvol.exe" eli:Desktop/Auvol_new.exe
 echo "==> Restart Mac receiver"
 pkill -x Auvol 2>/dev/null || true
 sleep 0.5
-"$MAC_APP/Contents/MacOS/Auvol" &
-disown 2>/dev/null || true
+open "$MAC_APP"
 
 echo "==> Done. Windows: Desktop\\Auvol.exe — Disconnect 后重新 Connect。"
