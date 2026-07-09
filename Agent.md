@@ -25,7 +25,7 @@ ELI
 eli\rfnor
 ```
 
-若失败，按 `~/.agents/skills/windows-lan-ssh-control/SKILL.md` 排查。优先使用 SSH 别名 `eli`（Tailscale IP `100.112.117.86`），不要用 MagicDNS（Surge fake-ip 会导致 SSH 超时）。
+若失败，按 `~/.agents/skills/windows-lan-ssh-control/SKILL.md` 排查。优先使用 SSH 别名 `eli`（固定到 Tailscale IP `100.112.117.86`）。MagicDNS 当前可用于人工检查，但自动化脚本仍应使用 `eli`，避免 DNS、代理或 resolver 状态变化影响 SSH。
 
 连通之前：**停止，不改代码，告知用户连接失败。**
 
@@ -60,7 +60,8 @@ eli\rfnor
 ```text
 SSH 别名: eli / win
 用户:     rfnor
-主机:     100.112.117.86 (Tailscale)
+主机:     100.112.117.86 (官方 Tailscale)
+MagicDNS: eli.tail5f875c.ts.net
 电脑名:   ELI
 桌面 exe: C:\Users\rfnor\Desktop\Auvol.exe
 Mac IP:   192.168.101.162（Windows 端默认填入）
@@ -77,7 +78,8 @@ Mac IP:   192.168.101.162（Windows 端默认填入）
 - **禁止**在 Windows 不可达时修改代码或提交
 - **禁止**只改 Mac 端或只改 Windows 端而不部署、不联调（除非用户明确要求仅做只读分析）
 - **禁止**改完代码不跑 `./deploy.sh` 就声称完成
-- **禁止**用 MagicDNS  hostname 做 SSH 自动化（用 `eli` 别名）
+- **禁止**用 LAN IP 或临时 HTTP agent 替代 Tailscale + OpenSSH 控制面
+- **禁止**在自动化里依赖 MagicDNS hostname；统一用 `eli` 别名
 
 ## 只读任务例外
 
