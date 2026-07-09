@@ -15,7 +15,7 @@
 每次开始开发任务时，**第一步**执行：
 
 ```bash
-~/.codex/skills/windows-lan-ssh-control/scripts/winps.sh 'hostname; whoami'
+~/.codex/skills/windows-tailscale-ssh-control/scripts/winps.sh 'hostname; whoami'
 ```
 
 期望输出：
@@ -25,7 +25,7 @@ ELI
 eli\rfnor
 ```
 
-若失败，按 `~/.agents/skills/windows-lan-ssh-control/SKILL.md` 排查。优先使用 SSH 别名 `eli`（固定到 Tailscale IP `100.112.117.86`）。MagicDNS 当前可用于人工检查，但自动化脚本仍应使用 `eli`，避免 DNS、代理或 resolver 状态变化影响 SSH。
+若失败，按 `~/.agents/skills/windows-tailscale-ssh-control/SKILL.md` 排查。优先使用 SSH 别名 `eli`（固定到 Tailscale IP `100.112.117.86`）。MagicDNS 当前可用于人工检查，但自动化脚本仍应使用 `eli`，避免 DNS、代理或 resolver 状态变化影响 SSH。
 
 连通之前：**停止，不改代码，告知用户连接失败。**
 
@@ -70,7 +70,7 @@ Mac IP:   192.168.101.162（Windows 端默认填入）
 远程命令统一用：
 
 ```bash
-~/.codex/skills/windows-lan-ssh-control/scripts/winps.sh '<powershell 命令>'
+~/.codex/skills/windows-tailscale-ssh-control/scripts/winps.sh '<powershell 命令>'
 ```
 
 ## 禁止事项
