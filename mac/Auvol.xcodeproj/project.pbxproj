@@ -10,8 +10,8 @@
 		3BD0BD0AD7D750EBD7E93BF4 /* ReceiverEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6833A9BAD43D712DCD5AFF0B /* ReceiverEngine.swift */; };
 		753AF5C00AC47DCA52011428 /* AudioPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 693C245EAE0EB2F9B5B5A327 /* AudioPlayer.swift */; };
 		80E033D97D17CB0969011B6D /* StatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC4D22BBDDD4CB58C502FC1A /* StatusView.swift */; };
+		B20FD5FC7509D32F7012AB49 /* AudioRing.c in Sources */ = {isa = PBXBuildFile; fileRef = 7766717944A0BFD3082C1E30 /* AudioRing.c */; };
 		C192A35282280B2528EA5E49 /* Auvol.icon in Resources */ = {isa = PBXBuildFile; fileRef = 4BF7B13D14D2F171F15418B7 /* Auvol.icon */; };
-		CB8159FCAD9C52EE038CC18F /* RingBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E801F13CB05BFD33875316CA /* RingBuffer.swift */; };
 		CBAEFF17052D3CDD41A44656 /* NetworkReceiver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B252C4A09639EDD9CD76163 /* NetworkReceiver.swift */; };
 		F3F4219AA07EADFC281A83AA /* Protocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49C17C025BD4D7601298E8AD /* Protocol.swift */; };
 		F44513EC89AF511DE3EB7F1A /* AuvolApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA12E08C31F6C24A1D730037 /* AuvolApp.swift */; };
@@ -24,9 +24,11 @@
 		4BF7B13D14D2F171F15418B7 /* Auvol.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = Auvol.icon; sourceTree = "<group>"; };
 		6833A9BAD43D712DCD5AFF0B /* ReceiverEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiverEngine.swift; sourceTree = "<group>"; };
 		693C245EAE0EB2F9B5B5A327 /* AudioPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlayer.swift; sourceTree = "<group>"; };
+		7766717944A0BFD3082C1E30 /* AudioRing.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = AudioRing.c; sourceTree = "<group>"; };
+		909DF5FA8150044F93B5A21D /* AudioRing.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AudioRing.h; sourceTree = "<group>"; };
 		AC4D22BBDDD4CB58C502FC1A /* StatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusView.swift; sourceTree = "<group>"; };
+		D55059006C0F9A1936D991AC /* Auvol-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Auvol-Bridging-Header.h"; sourceTree = "<group>"; };
 		DA12E08C31F6C24A1D730037 /* AuvolApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuvolApp.swift; sourceTree = "<group>"; };
-		E801F13CB05BFD33875316CA /* RingBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RingBuffer.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -51,11 +53,13 @@
 			isa = PBXGroup;
 			children = (
 				693C245EAE0EB2F9B5B5A327 /* AudioPlayer.swift */,
+				7766717944A0BFD3082C1E30 /* AudioRing.c */,
+				909DF5FA8150044F93B5A21D /* AudioRing.h */,
+				D55059006C0F9A1936D991AC /* Auvol-Bridging-Header.h */,
 				DA12E08C31F6C24A1D730037 /* AuvolApp.swift */,
 				0B252C4A09639EDD9CD76163 /* NetworkReceiver.swift */,
 				49C17C025BD4D7601298E8AD /* Protocol.swift */,
 				6833A9BAD43D712DCD5AFF0B /* ReceiverEngine.swift */,
-				E801F13CB05BFD33875316CA /* RingBuffer.swift */,
 				AC4D22BBDDD4CB58C502FC1A /* StatusView.swift */,
 			);
 			path = Auvol;
@@ -133,11 +137,11 @@
 			buildActionMask = 2147483647;
 			files = (
 				753AF5C00AC47DCA52011428 /* AudioPlayer.swift in Sources */,
+				B20FD5FC7509D32F7012AB49 /* AudioRing.c in Sources */,
 				F44513EC89AF511DE3EB7F1A /* AuvolApp.swift in Sources */,
 				CBAEFF17052D3CDD41A44656 /* NetworkReceiver.swift in Sources */,
 				F3F4219AA07EADFC281A83AA /* Protocol.swift in Sources */,
 				3BD0BD0AD7D750EBD7E93BF4 /* ReceiverEngine.swift in Sources */,
-				CB8159FCAD9C52EE038CC18F /* RingBuffer.swift in Sources */,
 				80E033D97D17CB0969011B6D /* StatusView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -156,6 +160,7 @@
 					"@executable_path/../Frameworks",
 				);
 				SDKROOT = macosx;
+				SWIFT_OBJC_BRIDGING_HEADER = "Auvol/Auvol-Bridging-Header.h";
 			};
 			name = Debug;
 		};
@@ -200,7 +205,7 @@
 				DEVELOPMENT_TEAM = "";
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_OPTIMIZATION_LEVEL = 0;
@@ -239,6 +244,7 @@
 					"@executable_path/../Frameworks",
 				);
 				SDKROOT = macosx;
+				SWIFT_OBJC_BRIDGING_HEADER = "Auvol/Auvol-Bridging-Header.h";
 			};
 			name = Release;
 		};
@@ -283,7 +289,7 @@
 				DEVELOPMENT_TEAM = "";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;

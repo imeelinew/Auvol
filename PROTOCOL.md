@@ -1,45 +1,63 @@
-# Audio LAN Protocol — "ALV1"
+# Auvol LAN Protocol — ALV2
 
-低延迟局域网音频传输协议。Windows 端抓取系统混音（WASAPI loopback），
-通过 UDP 发送裸 PCM 到 Mac 端播放。Mac 的系统音频和本 app 的音频都走
-默认输出设备（蓝牙耳机），由 macOS 自动混音，无需额外混音逻辑。
+ALV2 carries uncompressed stereo float32 PCM from Windows WASAPI loopback to the
+Mac. It is intentionally small, fixed-endian and incompatible with ALV1.
 
-所有多字节整数均为 **小端序**（x86 / Apple Silicon 均为小端）。
+All integers are unsigned little-endian. Every packet starts with the four wire
+bytes `41 4c 56 32` (`ALV2`). UDP port is 7777.
 
-## 包格式
+## Common header
 
-### 公共头部（所有包）
-| offset | size | field | 说明 |
-|--------|------|-------|------|
-| 0  | 4 | magic | `0x414C5631` ("ALV1") |
-| 4  | 4 | type  | `0` = config, `1` = audio |
+| Offset | Size | Field | Description |
+|---:|---:|---|---|
+| 0 | 4 | magic | `ALV2` |
+| 4 | 2 | type | `0` config, `1` audio |
+| 6 | 2 | header_bytes | 28 for config, 32 for audio |
+| 8 | 4 | stream_id | New non-zero ID for every Windows connection |
 
-### Config 包 (type = 0)
-总长度 20 字节，无 payload。
+`stream_id` distinguishes a restarted sender from a repeated config packet. A
+receiver resets playback only when the stream or format actually changes.
 
-| offset | size | field | 说明 |
-|--------|------|-------|------|
-| 8  | 4 | sample_rate | 采样率 (Hz)，如 48000 |
-| 12 | 4 | channels    | 声道数，如 2 |
-| 16 | 4 | frame_size  | 每个 audio 包的帧数，如 120 |
+## Config packet
 
-发送端启动时发一次，之后**每秒重发一次**，便于接收端随时加入。
-接收端按 config 配置 AudioUnit；收到相同 config 时忽略。
+Exactly 28 bytes. Sent before audio and repeated every 500 ms.
 
-### Audio 包 (type = 1)
-| offset | size | field | 说明 |
-|--------|------|-------|------|
-| 8  | 4 | seq | 序号，从 0 递增 |
-| 12 | 8 | timestamp | 发送端微秒级单调时间戳（接收端可忽略） |
-| 20 | N | payload | `frame_size * channels * 4` 字节的 float32 交错 PCM |
+| Offset | Size | Field | Description |
+|---:|---:|---|---|
+| 12 | 4 | sample_rate | WASAPI mix rate, normally 48000 |
+| 16 | 2 | channels | Always 2 |
+| 18 | 2 | max_packet_frames | Currently 160 |
+| 20 | 4 | capture_period_frames | WASAPI shared-engine buffer/period |
+| 24 | 4 | reserved | Zero |
 
-`N = frame_size * channels * 4`。默认 120 帧 / 2 声道 → 960 字节 payload，
-整包 980 字节，低于以太网 MTU 1500，**不会 IP 分片**（Wi-Fi 丢包不会放大）。
+## Audio packet
 
-## 参数约定
+32-byte header followed by interleaved stereo float32 PCM.
 
-- 编码：float32 (IEEE 754)，WASAPI shared mode 原生格式，零转换。
-- 采样率：跟随 Windows 端 mix format（通常 44100 或 48000），接收端自适应。
-- 声道：固定 2（立体声）。
-- 传输：UDP，无重传、无 FEC。丢包由接收端 jitter buffer 吸收，严重时输出静音。
-- 端口：默认 7777，可配置。
+| Offset | Size | Field | Description |
+|---:|---:|---|---|
+| 12 | 4 | sequence | Increments once per UDP audio packet |
+| 16 | 8 | first_frame | WASAPI device-frame position of the first payload frame |
+| 24 | 2 | frame_count | 1–160 |
+| 26 | 2 | channels | Always 2 |
+| 28 | 2 | flags | Bit 0: WASAPI data discontinuity |
+| 30 | 2 | reserved | Zero |
+| 32 | N | payload | `frame_count * 2 * 4` bytes |
+
+At 160 frames the datagram is 1312 bytes, below a 1500-byte Ethernet MTU after
+IP/UDP headers. Packets therefore do not rely on IP fragmentation.
+
+## Timing model
+
+- Windows uses event-driven shared-mode WASAPI loopback and sends each captured
+  buffer immediately, split only to stay below MTU.
+- The Mac warms the output graph, discards the one-time WASAPI startup backlog,
+  then begins playback with a small configurable prime (12 ms by default).
+- A preallocated single-producer/single-consumer ring bridges the UDP and Core
+  Audio real-time threads.
+- Windows capture and Mac output clocks are independent. The receiver keeps the
+  ring near its target with a slow PLL and a tightly bounded Apple varispeed
+  unit. Normal PCM is never encoded, quantized, or continuously rewritten.
+- `first_frame` detects missing, duplicate and stale audio independently of UDP
+  sequence wrap. Small losses are replaced with silence; a large discontinuity
+  causes a clean re-prime instead of playing stale audio.

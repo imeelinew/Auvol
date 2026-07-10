@@ -12,10 +12,31 @@
 
 ## 开发前：必须验证 Windows 连通
 
-每次开始开发任务时，**第一步**执行：
+每次开始开发任务时，**第一步**验证 SSH 可达。
+
+### 路径选择
+
+Mac 通过 **OpenSSH** 控制 Windows，有两条路径（详见 `~/.codex/skills/windows-tailscale-ssh-control/SKILL.md`）：
+
+| 路径 | SSH 别名 | 地址 | 场景 |
+|------|----------|------|------|
+| 远程 Tailscale | `eli` / `win` | `100.112.117.86` | 外出、通用默认 |
+| 局域网直连 | `eli-lan` | `192.168.101.170` | 在家同一 WiFi，更快 |
+
+Mac 侧 Tailnet 由 **Surge 内置 Tailscale**（`surge-mac`）提供；Mac 上 **没有** 独立 Tailscale App。
+
+### 连通性检查
+
+**默认（远程）：**
 
 ```bash
 ~/.codex/skills/windows-tailscale-ssh-control/scripts/winps.sh 'hostname; whoami'
+```
+
+**在家（优先，更快）：**
+
+```bash
+WIN_HOST=eli-lan ~/.codex/skills/windows-tailscale-ssh-control/scripts/winps.sh 'hostname; whoami'
 ```
 
 期望输出：
@@ -25,7 +46,7 @@ ELI
 eli\rfnor
 ```
 
-若失败，按 `~/.agents/skills/windows-tailscale-ssh-control/SKILL.md` 排查。优先使用 SSH 别名 `eli`（固定到 Tailscale IP `100.112.117.86`）。MagicDNS 当前可用于人工检查，但自动化脚本仍应使用 `eli`，避免 DNS、代理或 resolver 状态变化影响 SSH。
+若失败，按 `~/.codex/skills/windows-tailscale-ssh-control/SKILL.md` 排查对应路径。不要用 `tailscale ping` 或 `ping 100.x` 判断 Mac→Windows 连通性。
 
 连通之前：**停止，不改代码，告知用户连接失败。**
 
@@ -41,6 +62,12 @@ eli\rfnor
    ./deploy.sh
    ```
 
+   在家部署可加速：
+
+   ```bash
+   WIN_HOST=eli-lan ./deploy.sh
+   ```
+
    该脚本会：交叉编译 `windows/Auvol.exe` → 编译 Mac 接收端 → 推到 Windows 桌面 → 重启 Mac 接收端
 
 4. **告知用户**：Windows 需 **Disconnect → 重新 Connect** 才会用到新 exe
@@ -52,34 +79,42 @@ eli\rfnor
 |------|------|
 | `mac/` | Mac 菜单栏 app，UDP 接收 + AVAudioEngine 播放 |
 | `windows/` | Windows GUI，WASAPI loopback 采集 + UDP 发送 |
-| `PROTOCOL.md` | ALV1 协议定义 |
+| `PROTOCOL.md` | ALV2 协议定义 |
 | `deploy.sh` | 一键编译并更新 Mac + Windows 桌面 App |
 
 ## Windows 连接信息
 
 ```text
-SSH 别名: eli / win
-用户:     rfnor
-主机:     100.112.117.86 (官方 Tailscale)
-MagicDNS: eli.tail5f875c.ts.net
-电脑名:   ELI
-桌面 exe: C:\Users\rfnor\Desktop\Auvol.exe
-Mac IP:   192.168.101.162（Windows 端默认填入）
+用户:       rfnor
+电脑名:     ELI
+桌面 exe:   C:\Users\rfnor\Desktop\Auvol.exe
+Mac IP:     192.168.101.162（Windows 端默认填入）
+
+远程 SSH:   eli / win  →  100.112.117.86  (Surge 内置 Tailscale)
+局域网 SSH: eli-lan    →  192.168.101.170 (同一 WiFi，不走 Tailscale)
+MagicDNS:   eli.tail5f875c.ts.net（仅人工参考，自动化用别名）
 ```
 
-远程命令统一用：
+远程命令：
 
 ```bash
+# 默认远程
 ~/.codex/skills/windows-tailscale-ssh-control/scripts/winps.sh '<powershell 命令>'
+
+# 在家局域网
+WIN_HOST=eli-lan ~/.codex/skills/windows-tailscale-ssh-control/scripts/winps.sh '<powershell 命令>'
 ```
+
+`deploy.sh` 通过 `WIN_HOST` 环境变量选择路径（默认 `eli`）。
 
 ## 禁止事项
 
 - **禁止**在 Windows 不可达时修改代码或提交
 - **禁止**只改 Mac 端或只改 Windows 端而不部署、不联调（除非用户明确要求仅做只读分析）
 - **禁止**改完代码不跑 `./deploy.sh` 就声称完成
-- **禁止**用 LAN IP 或临时 HTTP agent 替代 Tailscale + OpenSSH 控制面
-- **禁止**在自动化里依赖 MagicDNS hostname；统一用 `eli` 别名
+- **禁止**在 Mac 上重装独立 Tailscale App（与 Surge 冲突）
+- **禁止**用临时 HTTP agent 替代 OpenSSH 控制面
+- **禁止**在自动化里依赖 MagicDNS hostname；统一用 `eli` 或 `eli-lan` 别名
 
 ## 只读任务例外
 

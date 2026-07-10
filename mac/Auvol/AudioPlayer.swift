@@ -1,240 +1,407 @@
-import Foundation
 import AVFoundation
+import CoreAudio
+import Foundation
+import OSLog
 
-/// 用 AVAudioEngine + AVAudioSourceNode 从 ring buffer 拉取音频。
-/// 正常路径 1:1 直通；仅在真正缺帧时 stretch，避免持续 resample 引入杂音。
+struct AudioPlayerStats {
+    let bufferFrames: UInt32
+    let pushedFrames: UInt64
+    let renderedFrames: UInt64
+    let underrunFrames: UInt64
+    let overflowFrames: UInt64
+    let renderQuantumFrames: UInt32
+    let maximumRenderQuantumFrames: UInt32
+    let ratePPM: Double
+}
+
+/// Real-time audio sink: the render callback only performs atomic ring reads and copies.
+/// A slow PLL controls Apple's varispeed unit to absorb independent Windows/Mac clocks.
 final class AudioPlayer {
+    private let logger = Logger(subsystem: "com.eli.Auvol", category: "audio")
     private let engine = AVAudioEngine()
+    private let stateLock = NSLock()
+    private let controllerQueue = DispatchQueue(
+        label: "com.eli.Auvol.clock",
+        qos: .userInteractive
+    )
+
     private var sourceNode: AVAudioSourceNode?
-    private var ring: RingBuffer?
-    private var format: AVAudioFormat?
+    private var varispeedNode: AVAudioUnitVarispeed?
+    private var ring: OpaquePointer?
+    private var configured: StreamConfig?
     private var running = false
     private var primed = false
-    private let lock = NSLock()
-    private var configured: AudioConfig?
-    private var channelCount = 2
-    private var lastSample: [Float] = [0, 0]
-    private var wasStarved = false
+    private var firstPushUptime: UInt64?
+    private var targetBufferMs = 15
+    private var outputDeviceBufferFrames: UInt32 = 0
 
-    var targetBufferMs: Int = 80
-    private(set) var underruns = 0
-    private(set) var overflows = 0
+    private var controllerTimer: DispatchSourceTimer?
+    private var controllerToken: UInt64 = 0
+    private var filteredFillError = 0.0
+    private var integralCorrection = 0.0
+    private var rateCorrection = 0.0
+    private var configurationObserver: NSObjectProtocol?
 
-    var isPlaying: Bool { running && engine.isRunning }
-
-    var bufferLevelMs: Double {
-        guard let r = ring, let sr = format?.sampleRate else { return 0 }
-        return Double(r.availableFrames) / sr * 1000.0
+    init() {
+        configurationObserver = NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange,
+            object: engine,
+            queue: nil
+        ) { [weak self] _ in
+            self?.restartAfterOutputChange()
+        }
     }
 
-    func configure(sampleRate: Double, channels: UInt32, frameSize: UInt32) {
-        lock.lock(); defer { lock.unlock() }
+    var isPlaying: Bool {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return running && primed && engine.isRunning
+    }
 
-        let cfg = AudioConfig(sampleRate: sampleRate, channels: channels, frameSize: frameSize)
-        if configured == cfg { return }
-        configured = cfg
-        channelCount = Int(channels)
-        lastSample = Array(repeating: 0, count: channelCount)
-        wasStarved = false
+    func setTargetBufferMs(_ milliseconds: Int) {
+        stateLock.lock()
+        targetBufferMs = min(80, max(8, milliseconds))
+        stateLock.unlock()
+    }
+
+    @discardableResult
+    func configure(_ config: StreamConfig) -> Bool {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        guard configured != config else { return false }
 
         teardownLocked()
+        outputDeviceBufferFrames = requestLowLatencyOutputBuffer()
 
-        guard let fmt = AVAudioFormat(standardFormatWithSampleRate: sampleRate,
-                                      channels: AVAudioChannelCount(channels)) else { return }
-        format = fmt
-        ring = RingBuffer(capacityFrames: Int(sampleRate * 3), channels: channelCount)
-
-        let ch = channelCount
-        let node = AVAudioSourceNode(format: fmt) { [weak self] _, _, frameCount, abl -> OSStatus in
-            guard let self else { return noErr }
-            return self.render(frames: Int(frameCount), abl: abl, channels: ch)
+        let capacity = UInt32(config.sampleRate / 2)
+        guard let newRing = auvol_ring_create(capacity),
+              let format = AVAudioFormat(
+                  standardFormatWithSampleRate: config.sampleRate,
+                  channels: AVAudioChannelCount(ALV2.stereoChannels)
+              ) else {
+            return false
         }
-        sourceNode = node
 
-        engine.attach(node)
-        engine.connect(node, to: engine.mainMixerNode, format: fmt)
-        engine.prepare()
-    }
-
-    func push(_ data: UnsafePointer<Float>, frames: Int) {
-        lock.lock()
-        let r = ring
-        let needStart = !primed
-        lock.unlock()
-        guard let r = r else { return }
-
-        let written = r.write(data, frames: frames)
-        if written < frames { overflows += 1 }
-
-        trimBufferIfNeeded(r)
-
-        if needStart { maybeStart() }
-    }
-
-    /// UDP 丢包时用上一帧样本填充 gap，避免波形硬断。
-    func pushConcealment(frames: Int) {
-        guard frames > 0 else { return }
-        lock.lock()
-        let samples = lastSample
-        let ch = channelCount
-        lock.unlock()
-
-        var buf = [Float](repeating: 0, count: frames * ch)
-        for i in 0..<frames {
-            for c in 0..<ch where c < samples.count {
-                buf[i * ch + c] = samples[c]
+        let source = AVAudioSourceNode(format: format) { _, _, frameCount, audioBufferList in
+            let buffers = UnsafeMutableAudioBufferListPointer(audioBufferList)
+            guard buffers.count >= 2,
+                  let left = buffers[0].mData?.assumingMemoryBound(to: Float.self),
+                  let right = buffers[1].mData?.assumingMemoryBound(to: Float.self) else {
+                for buffer in buffers {
+                    if let data = buffer.mData {
+                        memset(data, 0, Int(buffer.mDataByteSize))
+                    }
+                }
+                return noErr
             }
+            auvol_ring_render_stereo(newRing, left, right, frameCount)
+            return noErr
         }
-        buf.withUnsafeBufferPointer { ptr in
-            guard let base = ptr.baseAddress else { return }
-            push(base, frames: frames)
-        }
-    }
+        let varispeed = AVAudioUnitVarispeed()
+        varispeed.rate = 1
 
-    private func targetFrames() -> Int {
-        guard let fmt = format else { return 0 }
-        return Int(fmt.sampleRate * Double(targetBufferMs) / 1000.0)
-    }
+        engine.attach(source)
+        engine.attach(varispeed)
+        engine.connect(source, to: varispeed, format: format)
+        engine.connect(varispeed, to: engine.mainMixerNode, format: format)
+        engine.mainMixerNode.outputVolume = 1
+        engine.prepare()
 
-    private func trimBufferIfNeeded(_ r: RingBuffer) {
-        let target = targetFrames()
-        guard target > 0 else { return }
-        let avail = r.availableFrames
-        if avail > target * 2 {
-            r.discard(frames: avail - target)
-        }
-    }
-
-    private func maybeStart() {
-        lock.lock(); defer { lock.unlock() }
-        guard !running, !primed, let r = ring, sourceNode != nil else { return }
-        guard r.availableFrames >= targetFrames() else { return }
-
+        ring = newRing
+        sourceNode = source
+        varispeedNode = varispeed
+        configured = config
         do {
             try engine.start()
             running = true
-            primed = true
+        } catch {
+            logger.error("engine warm-up failed: \(error.localizedDescription, privacy: .public)")
+            teardownLocked()
+            return false
+        }
+        startControllerLocked()
+        logger.notice("configured stream=\(config.streamID) sampleRate=\(config.sampleRate, privacy: .public) outputBufferFrames=\(self.outputDeviceBufferFrames)")
+        return true
+    }
+
+    @discardableResult
+    func push(_ samples: UnsafePointer<Float>, frames: UInt32) -> Bool {
+        stateLock.lock()
+        guard let ring else {
+            stateLock.unlock()
+            return false
+        }
+        if firstPushUptime == nil {
+            firstPushUptime = DispatchTime.now().uptimeNanoseconds
+        }
+        let written = auvol_ring_write(ring, samples, frames)
+        stateLock.unlock()
+        if written == frames {
+            maybeStart()
+            return true
+        }
+        return false
+    }
+
+    @discardableResult
+    func pushSilence(frames: UInt32) -> Bool {
+        guard frames > 0 else { return true }
+        stateLock.lock()
+        guard let ring else {
+            stateLock.unlock()
+            return false
+        }
+        if firstPushUptime == nil {
+            firstPushUptime = DispatchTime.now().uptimeNanoseconds
+        }
+        let written = auvol_ring_write_silence(ring, frames)
+        stateLock.unlock()
+        if written == frames {
+            maybeStart()
+            return true
+        }
+        return false
+    }
+
+    func snapshot() -> AudioPlayerStats {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        var raw = AuvolAudioRingStats()
+        if let ring {
+            auvol_ring_snapshot(ring, &raw)
+        }
+        return AudioPlayerStats(
+            bufferFrames: raw.availableFrames,
+            pushedFrames: raw.pushedFrames,
+            renderedFrames: raw.renderedFrames,
+            underrunFrames: raw.underrunFrames,
+            overflowFrames: raw.overflowFrames,
+            renderQuantumFrames: raw.lastRenderFrames,
+            maximumRenderQuantumFrames: raw.maxRenderFrames,
+            ratePPM: rateCorrection * 1_000_000
+        )
+    }
+
+    func stop() {
+        stateLock.lock()
+        teardownLocked()
+        stateLock.unlock()
+    }
+
+    func resetBuffer() {
+        stateLock.lock()
+        if engine.isRunning { engine.stop() }
+        if let ring {
+            auvol_ring_reset(ring)
+        }
+        primed = false
+        firstPushUptime = nil
+        filteredFillError = 0
+        integralCorrection = 0
+        rateCorrection = 0
+        varispeedNode?.rate = 1
+        engine.prepare()
+        do {
+            try engine.start()
+            running = true
         } catch {
             running = false
+            logger.error("engine re-prime failed: \(error.localizedDescription, privacy: .public)")
         }
+        stateLock.unlock()
     }
 
-    private func render(frames: Int, abl: UnsafeMutablePointer<AudioBufferList>, channels ch: Int) -> OSStatus {
-        guard let r = ring, frames > 0 else { return noErr }
-        let buffers = UnsafeMutableAudioBufferListPointer(abl)
-        guard buffers.count >= ch else { return noErr }
+    private func maybeStart() {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        guard running,
+              !primed,
+              let ring,
+              let configured,
+              let firstPushUptime,
+              sourceNode != nil else { return }
 
-        let avail = r.availableFrames
-        var temp = [Float](repeating: 0, count: frames * ch)
+        // WASAPI loopback releases a one-time startup backlog. Keep the output
+        // gated until that burst is fully received, then retain only live audio.
+        guard DispatchTime.now().uptimeNanoseconds - firstPushUptime >= 200_000_000
+        else { return }
 
-        if avail >= frames {
-            let read = temp.withUnsafeMutableBufferPointer { ptr in
-                r.read(into: ptr.baseAddress!, frames: frames)
-            }
-            if read < frames {
-                stretchPartialRead(into: &temp, read: read, frames: frames, ch: ch)
-            }
-        } else if avail > 0 {
-            var src = [Float](repeating: 0, count: avail * ch)
-            let read = src.withUnsafeMutableBufferPointer { ptr in
-                r.read(into: ptr.baseAddress!, frames: avail)
-            }
-            if read > 0 {
-                stretch(into: &temp, src: src, srcFrames: read, dstFrames: frames, ch: ch)
-            }
-            lock.lock()
-            underruns += frames - read
-            lock.unlock()
-        } else {
-            lock.lock()
-            underruns += frames
-            lock.unlock()
-            for i in 0..<frames {
-                for c in 0..<ch where c < lastSample.count {
-                    temp[i * ch + c] = lastSample[c]
-                }
-            }
-            wasStarved = true
+        let targetFrames = UInt32(configured.sampleRate * Double(targetBufferMs) / 1_000)
+        let safetyFrames = max(UInt32(configured.maximumPacketFrames),
+                               outputDeviceBufferFrames)
+        let primeFrames = targetFrames + safetyFrames
+        let availableFrames = auvol_ring_available(ring)
+        guard availableFrames >= primeFrames else { return }
+        if availableFrames > primeFrames {
+            // Playback has not started, so removing pre-start backlog is inaudible.
+            _ = auvol_ring_discard(ring, availableFrames - primeFrames)
         }
 
-        if avail > 0 && wasStarved {
-            let fade = min(32, frames)
-            for i in 0..<fade {
-                let t = Float(i + 1) / Float(fade)
-                for c in 0..<ch where c < lastSample.count {
-                    let idx = i * ch + c
-                    temp[idx] = lastSample[c] * (1 - t) + temp[idx] * t
-                }
-            }
-            wasStarved = false
-        }
-
-        for c in 0..<ch where c < lastSample.count {
-            lastSample[c] = temp[(frames - 1) * ch + c]
-        }
-
-        for c in 0..<ch {
-            guard let dst = buffers[c].mData?.assumingMemoryBound(to: Float.self) else { continue }
-            for i in 0..<frames {
-                dst[i] = temp[i * ch + c]
-            }
-        }
-        return noErr
+        auvol_ring_set_playback_enabled(ring, 1)
+        primed = true
+        logger.notice("primed availableFrames=\(auvol_ring_available(ring)) targetFrames=\(targetFrames) safetyFrames=\(safetyFrames)")
     }
 
-    private func stretchPartialRead(into temp: inout [Float], read: Int, frames: Int, ch: Int) {
-        lock.lock()
-        underruns += frames - read
-        lock.unlock()
-        let base = max(0, read - 1) * ch
-        for i in read..<frames {
-            for c in 0..<ch {
-                temp[i * ch + c] = read > 0 ? temp[base + c] : lastSample[c]
-            }
+    private func startControllerLocked() {
+        controllerToken &+= 1
+        let token = controllerToken
+        filteredFillError = 0
+        integralCorrection = 0
+        rateCorrection = 0
+
+        let timer = DispatchSource.makeTimerSource(queue: controllerQueue)
+        timer.schedule(deadline: .now() + .milliseconds(50),
+                       repeating: .milliseconds(50),
+                       leeway: .milliseconds(1))
+        timer.setEventHandler { [weak self] in
+            self?.updateClockController(token: token)
         }
+        controllerTimer = timer
+        timer.resume()
     }
 
-    private func stretch(into dst: inout [Float], src: [Float], srcFrames: Int, dstFrames: Int, ch: Int) {
-        guard srcFrames > 0, dstFrames > 0 else { return }
-        if srcFrames == 1 || dstFrames == 1 {
-            for i in 0..<dstFrames {
-                for c in 0..<ch { dst[i * ch + c] = src[c] }
-            }
-            return
+    private func updateClockController(token: UInt64) {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        guard token == controllerToken,
+              running,
+              primed,
+              let ring,
+              let configured,
+              let varispeedNode else { return }
+
+        let targetFrames = max(1, configured.sampleRate * Double(targetBufferMs) / 1_000)
+        let available = Double(auvol_ring_available(ring))
+        let error = min(2, max(-1, (available - targetFrames) / targetFrames))
+
+        // The low-pass rejects packet/callback burst cadence. The integral learns clock skew.
+        filteredFillError += (error - filteredFillError) * 0.08
+        integralCorrection += filteredFillError * 0.000_005
+        integralCorrection = min(0.001, max(-0.001, integralCorrection))
+
+        let desired = filteredFillError * 0.001 + integralCorrection
+        let clamped = min(0.0015, max(-0.0015, desired))
+        rateCorrection += (clamped - rateCorrection) * 0.10
+        varispeedNode.rate = Float(1 + rateCorrection)
+    }
+
+    private func restartAfterOutputChange() {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        guard configured != nil, running, !engine.isRunning else { return }
+        outputDeviceBufferFrames = requestLowLatencyOutputBuffer()
+        if let ring {
+            auvol_ring_reset(ring)
         }
-        let denom = max(dstFrames - 1, 1)
-        for i in 0..<dstFrames {
-            let pos = Double(i) * Double(srcFrames - 1) / Double(denom)
-            let idx = Int(pos)
-            let frac = Float(pos - Double(idx))
-            let idx2 = min(idx + 1, srcFrames - 1)
-            for c in 0..<ch {
-                let a = src[idx * ch + c]
-                let b = src[idx2 * ch + c]
-                dst[i * ch + c] = a + (b - a) * frac
-            }
+        primed = false
+        firstPushUptime = nil
+        engine.prepare()
+        do {
+            try engine.start()
+        } catch {
+            running = false
+            logger.error("engine restart failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 
     private func teardownLocked() {
-        if engine.isRunning { engine.stop() }
-        if let node = sourceNode {
-            engine.disconnectNodeOutput(node)
-            engine.detach(node)
-            sourceNode = nil
+        configured = nil
+        controllerToken &+= 1
+        controllerTimer?.cancel()
+        controllerTimer = nil
+
+        if engine.isRunning {
+            engine.stop()
+        }
+        if let sourceNode {
+            engine.disconnectNodeOutput(sourceNode)
+            engine.detach(sourceNode)
+        }
+        if let varispeedNode {
+            engine.disconnectNodeOutput(varispeedNode)
+            engine.detach(varispeedNode)
         }
         engine.reset()
+
+        sourceNode = nil
+        varispeedNode = nil
+        if let ring {
+            auvol_ring_destroy(ring)
+        }
+        ring = nil
         running = false
         primed = false
-        lastSample = Array(repeating: 0, count: channelCount)
-        wasStarved = false
+        firstPushUptime = nil
+        filteredFillError = 0
+        integralCorrection = 0
+        rateCorrection = 0
     }
 
-    func stop() {
-        lock.lock(); defer { lock.unlock() }
-        teardownLocked()
-        configured = nil
-        ring = nil
-        format = nil
+    /// macOS exposes the output quantum at device scope. Request 128 frames when supported.
+    private func requestLowLatencyOutputBuffer() -> UInt32 {
+        var deviceID = AudioDeviceID(0)
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        var defaultOutput = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        guard AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &defaultOutput,
+            0,
+            nil,
+            &size,
+            &deviceID
+        ) == noErr, deviceID != 0 else { return 0 }
+
+        var range = AudioValueRange()
+        size = UInt32(MemoryLayout<AudioValueRange>.size)
+        var rangeAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyBufferFrameSizeRange,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        guard AudioObjectGetPropertyData(
+            deviceID,
+            &rangeAddress,
+            0,
+            nil,
+            &size,
+            &range
+        ) == noErr else { return 0 }
+
+        var requested = UInt32(min(range.mMaximum,
+                                   max(range.mMinimum, 128)).rounded())
+        var frameAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyBufferFrameSize,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        size = UInt32(MemoryLayout<UInt32>.size)
+        _ = AudioObjectSetPropertyData(
+            deviceID,
+            &frameAddress,
+            0,
+            nil,
+            size,
+            &requested
+        )
+        _ = AudioObjectGetPropertyData(
+            deviceID,
+            &frameAddress,
+            0,
+            nil,
+            &size,
+            &requested
+        )
+        return requested
+    }
+
+    deinit {
+        if let configurationObserver {
+            NotificationCenter.default.removeObserver(configurationObserver)
+        }
+        stop()
     }
 }
