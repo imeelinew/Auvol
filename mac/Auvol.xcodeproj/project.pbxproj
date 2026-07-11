@@ -169,6 +169,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				MARKETING_VERSION = 0.2.0;
 				SDKROOT = macosx;
 				SWIFT_OBJC_BRIDGING_HEADER = "Auvol/Auvol-Bridging-Header.h";
 			};
@@ -253,6 +254,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				MARKETING_VERSION = 0.2.0;
 				SDKROOT = macosx;
 				SWIFT_OBJC_BRIDGING_HEADER = "Auvol/Auvol-Bridging-Header.h";
 			};
