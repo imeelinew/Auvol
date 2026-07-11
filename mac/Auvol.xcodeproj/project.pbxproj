@@ -8,7 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		3BD0BD0AD7D750EBD7E93BF4 /* ReceiverEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6833A9BAD43D712DCD5AFF0B /* ReceiverEngine.swift */; };
+		4CF88C6FC8E2731B77A9D69F /* SystemAudioSender.m in Sources */ = {isa = PBXBuildFile; fileRef = 2DD94B8398183BAC3DB15A9F /* SystemAudioSender.m */; };
 		753AF5C00AC47DCA52011428 /* AudioPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 693C245EAE0EB2F9B5B5A327 /* AudioPlayer.swift */; };
+		794E8F086EEE82C1C4918C2A /* AudioSender.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CA42E6CADBCAE40155EA99E /* AudioSender.swift */; };
 		80E033D97D17CB0969011B6D /* StatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC4D22BBDDD4CB58C502FC1A /* StatusView.swift */; };
 		B20FD5FC7509D32F7012AB49 /* AudioRing.c in Sources */ = {isa = PBXBuildFile; fileRef = 7766717944A0BFD3082C1E30 /* AudioRing.c */; };
 		C192A35282280B2528EA5E49 /* Auvol.icon in Resources */ = {isa = PBXBuildFile; fileRef = 4BF7B13D14D2F171F15418B7 /* Auvol.icon */; };
@@ -20,13 +22,16 @@
 /* Begin PBXFileReference section */
 		06C0F94AF7B3B427FFDE9EE2 /* Auvol.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Auvol.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		0B252C4A09639EDD9CD76163 /* NetworkReceiver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkReceiver.swift; sourceTree = "<group>"; };
+		2DD94B8398183BAC3DB15A9F /* SystemAudioSender.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SystemAudioSender.m; sourceTree = "<group>"; };
 		49C17C025BD4D7601298E8AD /* Protocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Protocol.swift; sourceTree = "<group>"; };
 		4BF7B13D14D2F171F15418B7 /* Auvol.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = Auvol.icon; sourceTree = "<group>"; };
+		5CA42E6CADBCAE40155EA99E /* AudioSender.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSender.swift; sourceTree = "<group>"; };
 		6833A9BAD43D712DCD5AFF0B /* ReceiverEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiverEngine.swift; sourceTree = "<group>"; };
 		693C245EAE0EB2F9B5B5A327 /* AudioPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlayer.swift; sourceTree = "<group>"; };
 		7766717944A0BFD3082C1E30 /* AudioRing.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = AudioRing.c; sourceTree = "<group>"; };
 		909DF5FA8150044F93B5A21D /* AudioRing.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AudioRing.h; sourceTree = "<group>"; };
 		AC4D22BBDDD4CB58C502FC1A /* StatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusView.swift; sourceTree = "<group>"; };
+		B0390DDC5801E29555F64454 /* SystemAudioSender.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SystemAudioSender.h; sourceTree = "<group>"; };
 		D55059006C0F9A1936D991AC /* Auvol-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Auvol-Bridging-Header.h"; sourceTree = "<group>"; };
 		DA12E08C31F6C24A1D730037 /* AuvolApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuvolApp.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -55,12 +60,15 @@
 				693C245EAE0EB2F9B5B5A327 /* AudioPlayer.swift */,
 				7766717944A0BFD3082C1E30 /* AudioRing.c */,
 				909DF5FA8150044F93B5A21D /* AudioRing.h */,
+				5CA42E6CADBCAE40155EA99E /* AudioSender.swift */,
 				D55059006C0F9A1936D991AC /* Auvol-Bridging-Header.h */,
 				DA12E08C31F6C24A1D730037 /* AuvolApp.swift */,
 				0B252C4A09639EDD9CD76163 /* NetworkReceiver.swift */,
 				49C17C025BD4D7601298E8AD /* Protocol.swift */,
 				6833A9BAD43D712DCD5AFF0B /* ReceiverEngine.swift */,
 				AC4D22BBDDD4CB58C502FC1A /* StatusView.swift */,
+				B0390DDC5801E29555F64454 /* SystemAudioSender.h */,
+				2DD94B8398183BAC3DB15A9F /* SystemAudioSender.m */,
 			);
 			path = Auvol;
 			sourceTree = "<group>";
@@ -138,11 +146,13 @@
 			files = (
 				753AF5C00AC47DCA52011428 /* AudioPlayer.swift in Sources */,
 				B20FD5FC7509D32F7012AB49 /* AudioRing.c in Sources */,
+				794E8F086EEE82C1C4918C2A /* AudioSender.swift in Sources */,
 				F44513EC89AF511DE3EB7F1A /* AuvolApp.swift in Sources */,
 				CBAEFF17052D3CDD41A44656 /* NetworkReceiver.swift in Sources */,
 				F3F4219AA07EADFC281A83AA /* Protocol.swift in Sources */,
 				3BD0BD0AD7D750EBD7E93BF4 /* ReceiverEngine.swift in Sources */,
 				80E033D97D17CB0969011B6D /* StatusView.swift in Sources */,
+				4CF88C6FC8E2731B77A9D69F /* SystemAudioSender.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -159,7 +169,6 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.0;
 				SDKROOT = macosx;
 				SWIFT_OBJC_BRIDGING_HEADER = "Auvol/Auvol-Bridging-Header.h";
 			};
@@ -220,7 +229,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.2;
 				MARKETING_VERSION = 1.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -244,7 +253,6 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.0;
 				SDKROOT = macosx;
 				SWIFT_OBJC_BRIDGING_HEADER = "Auvol/Auvol-Bridging-Header.h";
 			};
@@ -299,7 +307,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.2;
 				MARKETING_VERSION = 1.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;

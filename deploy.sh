@@ -15,7 +15,7 @@ echo "==> Windows Auvol.exe"
     -D_WIN32_WINNT=0x0A00 -DWIN32_LEAN_AND_MEAN -DUNICODE -D_UNICODE \
     -static -static-libgcc -static-libstdc++ \
     -o Auvol.exe Auvol.cpp Auvol_rc.o \
-    -lole32 -lws2_32 -lksuser -lgdi32 -lcomctl32 -luxtheme -lavrt -lshell32 -mwindows
+    -lole32 -lws2_32 -lksuser -lgdi32 -lcomctl32 -luxtheme -lavrt -lshell32 -ladvapi32 -mwindows
 )
 
 echo "==> Mac Auvol.app"
@@ -27,9 +27,9 @@ echo "==> Push to Windows Desktop"
 scp -o ConnectTimeout=20 "$ROOT/windows/Auvol.exe" "${SSH_TARGET}:Desktop/Auvol_new.exe"
 "$WINPS" 'Move-Item -Force "$env:USERPROFILE\Desktop\Auvol_new.exe" "$env:USERPROFILE\Desktop\Auvol.exe"'
 
-echo "==> Restart Mac receiver"
+echo "==> Restart Mac app"
 pkill -x Auvol 2>/dev/null || true
 sleep 0.5
 open "$MAC_APP"
 
-echo "==> Done. Windows: Desktop\\Auvol.exe — Disconnect 后重新 Connect。"
+echo "==> Done. Windows: Desktop\\Auvol.exe — launch once; direction/device changes recover automatically."

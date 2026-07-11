@@ -36,5 +36,7 @@
 	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Auvol needs local network access to receive audio from other devices.</string>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>Auvol captures system audio to send it to the selected LAN device.</string>
 </dict>
 </plist>

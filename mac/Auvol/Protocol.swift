@@ -8,7 +8,7 @@ enum ALV2 {
     static let configHeaderBytes: UInt16 = 28
     static let audioHeaderBytes: UInt16 = 32
     static let stereoChannels: UInt16 = 2
-    static let maximumPacketFrames: UInt16 = 180
+    static let maximumPacketFrames: UInt16 = 160
 }
 
 struct StreamConfig: Equatable {
@@ -16,7 +16,7 @@ struct StreamConfig: Equatable {
     let sampleRate: Double
     let channels: UInt16
     let maximumPacketFrames: UInt16
-    let capturePeriodFrames: UInt32
+    let sourcePeriodFrames: UInt32
 }
 
 struct AudioPacket {
@@ -49,17 +49,17 @@ enum PacketParser {
             let sampleRate = le32(bytes, 12)
             let channels = le16(bytes, 16)
             let maximumPacketFrames = le16(bytes, 18)
-            let capturePeriodFrames = le32(bytes, 20)
+            let sourcePeriodFrames = le32(bytes, 20)
             guard (8_000...192_000).contains(sampleRate),
                   channels == ALV2.stereoChannels,
                   (1...ALV2.maximumPacketFrames).contains(maximumPacketFrames),
-                  capturePeriodFrames > 0 else { return nil }
+                  sourcePeriodFrames > 0 else { return nil }
             return .config(StreamConfig(
                 streamID: streamID,
                 sampleRate: Double(sampleRate),
                 channels: channels,
                 maximumPacketFrames: maximumPacketFrames,
-                capturePeriodFrames: capturePeriodFrames
+                sourcePeriodFrames: sourcePeriodFrames
             ))
 
         case ALV2.typeAudio:

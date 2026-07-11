@@ -7,33 +7,29 @@ final class NetworkReceiver {
     private let stateLock = NSLock()
     private let stopped = DispatchGroup()
     private var socketFD: Int32 = -1
+    private var stopping = false
     private var bonjour: NetService?
     private var lastSenderIP = ""
 
     var onConfig: ((StreamConfig) -> Void)?
     var onAudio: ((AudioPacket, UnsafePointer<Float>) -> Void)?
     var onSenderSeen: ((String) -> Void)?
-    var onError: ((String) -> Void)?
+    var onFailure: ((String) -> Void)?
 
     init(port: UInt16) {
         self.port = port
     }
 
-    @discardableResult
-    func start() -> Bool {
+    /// Returns nil on success. Runtime socket death is reported through onFailure.
+    func start() -> String? {
         let fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
         guard fd >= 0 else {
-            onError?("socket() failed")
-            return false
+            return "Cannot open the UDP receiver"
         }
 
         var receiveBuffer: Int32 = 1 << 20
         setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &receiveBuffer,
                    socklen_t(MemoryLayout<Int32>.size))
-        var reuse: Int32 = 1
-        setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse,
-                   socklen_t(MemoryLayout<Int32>.size))
-
         var address = sockaddr_in()
         address.sin_family = sa_family_t(AF_INET)
         address.sin_port = port.bigEndian
@@ -44,12 +40,18 @@ final class NetworkReceiver {
             }
         }
         guard bindResult == 0 else {
+            let code = errno
             close(fd)
-            onError?("UDP port \(port) is unavailable")
-            return false
+            return "UDP port \(port) is unavailable (\(String(cString: strerror(code))))"
         }
 
         stateLock.lock()
+        guard socketFD < 0 else {
+            stateLock.unlock()
+            close(fd)
+            return "UDP receiver is already running"
+        }
+        stopping = false
         socketFD = fd
         stateLock.unlock()
 
@@ -59,11 +61,11 @@ final class NetworkReceiver {
         bonjour?.publish()
 
         stopped.enter()
-        queue.async { [weak self] in
-            self?.receiveLoop(fd: fd)
-            self?.stopped.leave()
+        queue.async { [self] in
+            receiveLoop(fd: fd)
+            stopped.leave()
         }
-        return true
+        return nil
     }
 
     func stop() {
@@ -71,6 +73,7 @@ final class NetworkReceiver {
         bonjour = nil
 
         stateLock.lock()
+        stopping = true
         let fd = socketFD
         socketFD = -1
         stateLock.unlock()
@@ -95,7 +98,17 @@ final class NetworkReceiver {
                     }
                 }
             }
-            guard count > 0 else { return }
+            guard count > 0 else {
+                let code = errno
+                stateLock.lock()
+                let unexpected = !stopping && socketFD == fd
+                if socketFD == fd { socketFD = -1 }
+                stateLock.unlock()
+                if unexpected {
+                    onFailure?("UDP receiver stopped (\(String(cString: strerror(code))))")
+                }
+                return
+            }
             guard let packet = PacketParser.parse(bytes, length: count) else { continue }
 
             let senderIP = ipString(source.sin_addr)

@@ -2,7 +2,7 @@ name: Auvol
 options:
   bundleIdPrefix: com.eli
   deploymentTarget:
-    macOS: "13.0"
+    macOS: "14.2"
   createIntermediateGroups: true
   fileTypes:
     icon:
@@ -48,6 +48,7 @@ targets:
         LSUIElement: true
         NSHighResolutionCapable: true
         NSLocalNetworkUsageDescription: "Auvol needs local network access to receive audio from other devices."
+        NSAudioCaptureUsageDescription: "Auvol captures system audio to send it to the selected LAN device."
         NSBonjourServices:
           - "_auvol._udp."
         LSApplicationCategoryType: public.app-category.utilities

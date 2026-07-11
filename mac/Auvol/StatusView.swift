@@ -6,9 +6,14 @@ struct StatusView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
+            roleControl
             connection
-            Divider()
-            latencyControl
+            if engine.role == .send {
+                peerControl
+            } else {
+                Divider()
+                latencyControl
+            }
             Divider()
             timingStats
             Divider()
@@ -17,7 +22,7 @@ struct StatusView: View {
             footer
         }
         .padding(16)
-        .frame(width: 292)
+        .frame(width: 310)
     }
 
     private var header: some View {
@@ -30,10 +35,22 @@ struct StatusView: View {
         }
     }
 
+    private var roleControl: some View {
+        Picker("Direction", selection: Binding(
+            get: { engine.role },
+            set: { engine.activate($0) }
+        )) {
+            ForEach(TransportRole.allCases, id: \.self) { role in
+                Text(role.title).tag(role)
+            }
+        }
+        .pickerStyle(.segmented)
+    }
+
     private var connection: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(connectionTitle)
-            if !engine.senderIP.isEmpty {
+            if engine.role == .receive && !engine.senderIP.isEmpty {
                 Text(engine.senderIP)
                     .font(.caption2.monospacedDigit())
                     .foregroundStyle(.tertiary)
@@ -46,6 +63,22 @@ struct StatusView: View {
         }
         .font(.caption)
         .foregroundStyle(.secondary)
+    }
+
+    private var peerControl: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text("Windows IP")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            TextField("192.168.x.x", text: Binding(
+                get: { engine.peerIP },
+                set: { engine.setPeerIP($0) }
+            ))
+            .textFieldStyle(.roundedBorder)
+            Text("Address changes are applied automatically.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
     }
 
     private var latencyControl: some View {
@@ -66,33 +99,40 @@ struct StatusView: View {
                 in: 8...80,
                 step: 1
             )
-            HStack {
-                Text("8 ms")
-                Spacer()
-                Text("80 ms")
-            }
-            .font(.caption2)
-            .foregroundStyle(.tertiary)
         }
     }
 
     private var timingStats: some View {
         VStack(spacing: 4) {
-            statRow("Queued", String(format: "%.1f ms", engine.bufferLevelMs))
-            statRow("Windows period", String(format: "%.1f ms", engine.capturePeriodMs))
-            statRow("Mac quantum", String(format: "%.1f ms", engine.outputQuantumMs))
-            statRow("Clock correction", String(format: "%+.0f ppm", engine.driftPPM))
+            if engine.role == .receive {
+                statRow("Queued", String(format: "%.1f ms", engine.bufferLevelMs))
+                statRow("Output quantum", String(format: "%.1f ms", engine.outputQuantumMs))
+                statRow("Clock correction", String(format: "%+.0f ppm", engine.driftPPM))
+            }
+            statRow("Source period", String(format: "%.1f ms", engine.sourcePeriodMs))
         }
     }
 
     private var healthStats: some View {
         VStack(spacing: 4) {
             statRow("Packets", "\(engine.packetRate)/s")
-            statRow("Lost / late", "\(engine.lostPackets) / \(engine.latePackets)")
-            statRow("Starved", "\(engine.starvedFramesPerSecond) frames/s")
-            statRow("Overflow", "\(engine.overflowFrames) frames")
-            if engine.captureGlitches > 0 {
-                statRow("Capture glitches", "\(engine.captureGlitches)")
+            statRow("Signal", engine.hasSignal
+                    ? String(format: "%.1f dBFS", engine.signalLevelDBFS)
+                    : "Silence")
+            if !engine.outputDeviceName.isEmpty {
+                statRow(engine.role == .receive ? "Playing on" : "Capturing from",
+                        engine.outputDeviceName)
+            }
+            if engine.role == .receive {
+                statRow("Lost / late", "\(engine.lostPackets) / \(engine.latePackets)")
+                statRow("Starved", "\(engine.starvedFramesPerSecond) frames/s")
+                statRow("Overflow", "\(engine.overflowFrames) frames")
+                if engine.captureGlitches > 0 {
+                    statRow("Capture glitches", "\(engine.captureGlitches)")
+                }
+            } else if engine.captureCallbackAgeMs > 0 {
+                statRow("Capture callback",
+                        String(format: "%.0f ms ago", engine.captureCallbackAgeMs))
             }
         }
     }
@@ -114,6 +154,14 @@ struct StatusView: View {
                     .foregroundStyle(.tertiary)
             }
             Spacer()
+            Button(engine.isActive ? "Pause" : "Resume") {
+                if engine.isActive {
+                    engine.stop()
+                } else {
+                    engine.start()
+                }
+            }
+                .buttonStyle(.borderless)
             Button("Quit") {
                 engine.stop()
                 NSApplication.shared.terminate(nil)
@@ -123,14 +171,13 @@ struct StatusView: View {
     }
 
     private var connectionTitle: String {
-        if engine.isPlaying { return "Streaming" }
-        if engine.isListening { return "Listening on UDP \(engine.port)" }
-        return "Stopped"
+        engine.statusMessage
     }
 
     private var statusColor: Color {
         if !engine.errorMessage.isEmpty { return .red }
-        if engine.isPlaying { return .green }
+        if engine.isRecovering { return .orange }
+        if engine.isSending || engine.isPlaying { return .green }
         if engine.isListening { return .orange }
         return .gray
     }
