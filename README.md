@@ -13,6 +13,8 @@ direction at a time: Windows → Mac or Mac → Windows.
 - **Mac send**: Core Audio system-audio tap, feeding raw PCM directly to UDP.
 - **Windows receive**: high-priority UDP receiver, atomic jitter ring and
   event-driven WASAPI render output.
+- **Windows UI**: native C++/WinRT with WinUI 3 and Windows App SDK 2.2;
+  transport code remains in the same native process.
 - **Mac receive**: high-priority UDP receive queue, preallocated C11 atomic
   SPSC ring and allocation-free Core Audio render callback.
 - **Protocol** (`PROTOCOL.md`): ALV2 raw stereo float32 PCM with stream identity,
@@ -45,8 +47,10 @@ closing the window records a paused state, so the next sign-in opens Auvol idle.
 
 ## Build and deploy
 
-`deploy.sh` regenerates the Xcode project, builds both apps, copies the Windows
-binary to the desktop and restarts the Mac app.
+`deploy.sh` regenerates the Xcode project, builds both apps, installs the WinUI
+app under `%LOCALAPPDATA%\Auvol`, and restarts both sides. The Windows source
+workspace is synchronized to `C:\dev\Auvol\windows` and built with Visual
+Studio's x64 C++ toolchain.
 
 ```sh
 # Same LAN: preferred
@@ -56,7 +60,7 @@ WIN_HOST=eli-lan ./deploy.sh
 ./deploy.sh
 ```
 
-After deployment, launch the new Windows app once. During normal use, default
+After deployment, the new Windows app launches automatically. During normal use, default
 audio-device changes, Bluetooth disconnects, transient WASAPI/Core Audio
 failures, and direction changes are recovered automatically. Start/Stop is a
 global pause control, not a recovery procedure.

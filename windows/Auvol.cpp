@@ -1,4 +1,4 @@
-// Auvol Windows sender: event-driven WASAPI loopback -> ALV2 UDP float32 PCM.
+// Auvol Windows transport core: bidirectional WASAPI <-> ALV2 UDP float32 PCM.
 
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -10,6 +10,7 @@
 #include <shellapi.h>
 
 #include "resource.h"
+#include "AuvolCore.h"
 
 #include <array>
 #include <algorithm>
@@ -20,6 +21,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <functional>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -68,6 +70,10 @@ static HANDLE g_controlEvent = nullptr;
 static std::thread g_audioThread;
 static std::string g_autoConnectIP;
 static int g_autoMode = 0;
+static std::mutex g_callbackMutex;
+static auvol::TextCallback g_statusCallback;
+static auvol::TextCallback g_statsCallback;
+static auvol::RunningCallback g_runningCallback;
 
 static bool SessionCurrent(UINT64 generation, int mode) {
     return g_running.load(std::memory_order_acquire) &&
@@ -196,11 +202,29 @@ static UINT64 Get64(const void* source) {
 }
 
 static void PostText(UINT message, std::string text) {
+    auvol::TextCallback callback;
+    {
+        std::lock_guard<std::mutex> lock(g_callbackMutex);
+        callback = message == WM_APP + 1 ? g_statusCallback : g_statsCallback;
+    }
+    if (callback) {
+        callback(std::move(text));
+        return;
+    }
     auto* payload = new std::string(std::move(text));
     if (!PostMessageA(g_mainWindow, message, 0,
                       reinterpret_cast<LPARAM>(payload))) {
         delete payload;
     }
+}
+
+static void NotifyRunning(bool running) {
+    auvol::RunningCallback callback;
+    {
+        std::lock_guard<std::mutex> lock(g_callbackMutex);
+        callback = g_runningCallback;
+    }
+    if (callback) callback(running);
 }
 
 static void PostStatus(const std::string& text) {
@@ -1329,7 +1353,8 @@ static void SupervisorThread(std::string targetIP, UINT16 port) {
         WaitForSingleObject(g_controlEvent, delay);
     }
     g_connected.store(false, std::memory_order_release);
-    PostMessageA(g_mainWindow, WM_APP + 3, 0, 0);
+    NotifyRunning(false);
+    if (g_mainWindow) PostMessageA(g_mainWindow, WM_APP + 3, 0, 0);
 }
 
 static void SetConnectedControls(bool connected) {
@@ -1351,21 +1376,12 @@ static void WriteUserDword(HKEY key, const wchar_t* name, DWORD value) {
 }
 
 static void SaveUserSettings(bool running) {
-    HKEY key = nullptr;
-    if (RegCreateKeyExW(HKEY_CURRENT_USER, L"Software\\Auvol", 0, nullptr, 0,
-                        KEY_SET_VALUE, nullptr, &key, nullptr) != ERROR_SUCCESS) {
-        return;
-    }
     char targetIP[64] = {};
     if (g_ipEdit) GetWindowTextA(g_ipEdit, targetIP, sizeof(targetIP));
-    const DWORD byteCount = static_cast<DWORD>(strlen(targetIP) + 1);
-    RegSetValueExA(key, "PeerIP", 0, REG_SZ,
-                   reinterpret_cast<const BYTE*>(targetIP), byteCount);
     const LRESULT selected = g_modeCombo
         ? SendMessageW(g_modeCombo, CB_GETCURSEL, 0, 0) : g_savedMode;
-    WriteUserDword(key, L"Mode", selected == 1 ? 1 : 0);
-    WriteUserDword(key, L"Running", running ? 1 : 0);
-    RegCloseKey(key);
+    auvol::SaveSettings(targetIP[0] ? targetIP : g_savedIP,
+                        selected == 1 ? 1 : 0, running);
 }
 
 static void LoadUserSettings() {
@@ -1441,6 +1457,116 @@ static std::string AutoConnectIP() {
     LocalFree(arguments);
     return result;
 }
+
+namespace auvol {
+
+void SetCallbacks(TextCallback status,
+                  TextCallback stats,
+                  RunningCallback running) {
+    std::lock_guard<std::mutex> lock(g_callbackMutex);
+    g_statusCallback = std::move(status);
+    g_statsCallback = std::move(stats);
+    g_runningCallback = std::move(running);
+}
+
+Settings LoadSettings() {
+    LoadUserSettings();
+    return {g_savedIP, g_savedMode, g_savedRunning};
+}
+
+void SaveSettings(const std::string& peerIP, int mode, bool running) {
+    HKEY key = nullptr;
+    if (RegCreateKeyExW(HKEY_CURRENT_USER, L"Software\\Auvol", 0, nullptr, 0,
+                        KEY_SET_VALUE, nullptr, &key, nullptr) != ERROR_SUCCESS) {
+        return;
+    }
+    const std::string value = peerIP.empty() ? g_savedIP : peerIP;
+    const DWORD byteCount = static_cast<DWORD>(value.size() + 1);
+    RegSetValueExA(key, "PeerIP", 0, REG_SZ,
+                   reinterpret_cast<const BYTE*>(value.c_str()), byteCount);
+    WriteUserDword(key, L"Mode", mode == 1 ? 1 : 0);
+    WriteUserDword(key, L"Running", running ? 1 : 0);
+    RegCloseKey(key);
+    g_savedIP = value;
+    g_savedMode = mode == 1 ? 1 : 0;
+    g_savedRunning = running;
+}
+
+void RegisterLoginLaunch() {
+    ::RegisterLoginLaunch();
+}
+
+std::string CommandLinePeer(int* mode) {
+    const std::string peer = AutoConnectIP();
+    if (mode) *mode = g_autoMode;
+    return peer;
+}
+
+bool Start(const std::string& peerIP, int mode) {
+    if (peerIP.empty() || g_connected.load(std::memory_order_acquire)) {
+        return false;
+    }
+    if (!g_controlEvent) {
+        g_controlEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+        if (!g_controlEvent) return false;
+    }
+    JoinAudioThread();
+    g_desiredMode.store(mode == 1 ? 1 : 0, std::memory_order_release);
+    g_controlGeneration.fetch_add(1, std::memory_order_acq_rel);
+    g_running.store(true, std::memory_order_release);
+    g_connected.store(true, std::memory_order_release);
+    ResetEvent(g_controlEvent);
+    g_audioThread = std::thread(SupervisorThread, peerIP,
+                                static_cast<UINT16>(7777));
+    SaveSettings(peerIP, mode, true);
+    NotifyRunning(true);
+    return true;
+}
+
+void Stop() {
+    if (!g_connected.load(std::memory_order_acquire) &&
+        !g_running.load(std::memory_order_acquire)) {
+        return;
+    }
+    g_running.store(false, std::memory_order_release);
+    g_controlGeneration.fetch_add(1, std::memory_order_acq_rel);
+    if (g_controlEvent) SetEvent(g_controlEvent);
+    JoinAudioThread();
+    g_connected.store(false, std::memory_order_release);
+    SaveSettings(g_savedIP, g_desiredMode.load(std::memory_order_acquire), false);
+    NotifyRunning(false);
+}
+
+void SwitchMode(int mode) {
+    const int normalized = mode == 1 ? 1 : 0;
+    g_desiredMode.store(normalized, std::memory_order_release);
+    g_savedMode = normalized;
+    if (g_connected.load(std::memory_order_acquire)) {
+        g_controlGeneration.fetch_add(1, std::memory_order_acq_rel);
+        if (g_controlEvent) SetEvent(g_controlEvent);
+        PostStatus("Switching direction automatically...");
+    }
+}
+
+bool IsRunning() {
+    return g_running.load(std::memory_order_acquire);
+}
+
+void Shutdown() {
+    Stop();
+    {
+        std::lock_guard<std::mutex> lock(g_callbackMutex);
+        g_statusCallback = {};
+        g_statsCallback = {};
+        g_runningCallback = {};
+    }
+    if (g_controlEvent) {
+        CloseHandle(g_controlEvent);
+        g_controlEvent = nullptr;
+    }
+}
+
+} // namespace auvol
 
 static LRESULT CALLBACK WindowProcedure(HWND window,
                                         UINT message,
@@ -1580,6 +1706,7 @@ static LRESULT CALLBACK WindowProcedure(HWND window,
     return DefWindowProcW(window, message, wParam, lParam);
 }
 
+#ifndef AUVOL_WINUI
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int showCommand) {
     HANDLE singleInstance = CreateMutexW(
         nullptr, TRUE, L"Global\\AuvolTransportSingleInstance"
@@ -1646,3 +1773,4 @@ int main() {
     return wWinMain(GetModuleHandleW(nullptr), nullptr, GetCommandLineW(),
                     SW_SHOWDEFAULT);
 }
+#endif

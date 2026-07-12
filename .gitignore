@@ -4,6 +4,13 @@ mac/.build/
 mac/Auvol.app/
 windows/Auvol.exe
 windows/Auvol_rc.o
+windows/packages/
+windows/winui/.vs/
+windows/winui/packages/
+windows/winui/Debug/
+windows/winui/Release/
+windows/winui/x64/
+windows/winui/Generated Files/
 
 # Xcode user data
 mac/Auvol.xcodeproj/xcuserdata/
