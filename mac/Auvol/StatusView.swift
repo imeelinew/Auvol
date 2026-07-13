@@ -21,8 +21,9 @@ struct StatusView: View {
             Divider()
             footer
         }
-        .padding(16)
-        .frame(width: 310)
+        .frame(width: 300, alignment: .leading)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
     }
 
     private var header: some View {
@@ -36,15 +37,17 @@ struct StatusView: View {
     }
 
     private var roleControl: some View {
-        Picker("Direction", selection: Binding(
+        Picker("传输方向", selection: Binding(
             get: { engine.role },
             set: { engine.activate($0) }
         )) {
             ForEach(TransportRole.allCases, id: \.self) { role in
-                Text(role.title).tag(role)
+                Text(role == .receive ? "从 Windows 接收" : "发送到 Windows")
+                    .tag(role)
             }
         }
         .pickerStyle(.segmented)
+        .labelsHidden()
     }
 
     private var connection: some View {
@@ -67,7 +70,7 @@ struct StatusView: View {
 
     private var peerControl: some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text("Windows IP")
+            Text("Windows 地址")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             TextField("192.168.x.x", text: Binding(
@@ -75,7 +78,7 @@ struct StatusView: View {
                 set: { engine.setPeerIP($0) }
             ))
             .textFieldStyle(.roundedBorder)
-            Text("Address changes are applied automatically.")
+            Text("地址修改后会自动应用。")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
         }
@@ -84,7 +87,7 @@ struct StatusView: View {
     private var latencyControl: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("Jitter target")
+                Text("缓冲目标")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -105,34 +108,34 @@ struct StatusView: View {
     private var timingStats: some View {
         VStack(spacing: 4) {
             if engine.role == .receive {
-                statRow("Queued", String(format: "%.1f ms", engine.bufferLevelMs))
-                statRow("Output quantum", String(format: "%.1f ms", engine.outputQuantumMs))
-                statRow("Clock correction", String(format: "%+.0f ppm", engine.driftPPM))
+                statRow("当前缓冲", String(format: "%.1f ms", engine.bufferLevelMs))
+                statRow("输出周期", String(format: "%.1f ms", engine.outputQuantumMs))
+                statRow("时钟校正", String(format: "%+.0f ppm", engine.driftPPM))
             }
-            statRow("Source period", String(format: "%.1f ms", engine.sourcePeriodMs))
+            statRow("源周期", String(format: "%.1f ms", engine.sourcePeriodMs))
         }
     }
 
     private var healthStats: some View {
         VStack(spacing: 4) {
-            statRow("Packets", "\(engine.packetRate)/s")
-            statRow("Signal", engine.hasSignal
+            statRow("数据包", "\(engine.packetRate)/秒")
+            statRow("信号", engine.hasSignal
                     ? String(format: "%.1f dBFS", engine.signalLevelDBFS)
-                    : "Silence")
+                    : "静音")
             if !engine.outputDeviceName.isEmpty {
-                statRow(engine.role == .receive ? "Playing on" : "Capturing from",
+                statRow(engine.role == .receive ? "播放设备" : "采集设备",
                         engine.outputDeviceName)
             }
             if engine.role == .receive {
-                statRow("Lost / late", "\(engine.lostPackets) / \(engine.latePackets)")
-                statRow("Starved", "\(engine.starvedFramesPerSecond) frames/s")
-                statRow("Overflow", "\(engine.overflowFrames) frames")
+                statRow("丢失 / 迟到", "\(engine.lostPackets) / \(engine.latePackets)")
+                statRow("音频欠载", "\(engine.starvedFramesPerSecond) 帧/秒")
+                statRow("缓冲溢出", "\(engine.overflowFrames) 帧")
                 if engine.captureGlitches > 0 {
-                    statRow("Capture glitches", "\(engine.captureGlitches)")
+                    statRow("采集异常", "\(engine.captureGlitches)")
                 }
             } else if engine.captureCallbackAgeMs > 0 {
-                statRow("Capture callback",
-                        String(format: "%.0f ms ago", engine.captureCallbackAgeMs))
+                statRow("采集回调",
+                        String(format: "%.0f ms 前", engine.captureCallbackAgeMs))
             }
         }
     }
@@ -149,12 +152,12 @@ struct StatusView: View {
     private var footer: some View {
         HStack {
             if engine.sampleRate > 0 {
-                Text("ALV2 · \(Int(engine.sampleRate)) Hz · stereo")
+                Text("ALV2 · \(Int(engine.sampleRate)) Hz · 双声道")
                     .font(.caption2.monospacedDigit())
                     .foregroundStyle(.tertiary)
             }
             Spacer()
-            Button(engine.isActive ? "Pause" : "Resume") {
+            Button(engine.isActive ? "暂停" : "继续") {
                 if engine.isActive {
                     engine.stop()
                 } else {
@@ -162,7 +165,7 @@ struct StatusView: View {
                 }
             }
                 .buttonStyle(.borderless)
-            Button("Quit") {
+            Button("退出") {
                 engine.stop()
                 NSApplication.shared.terminate(nil)
             }
@@ -171,14 +174,43 @@ struct StatusView: View {
     }
 
     private var connectionTitle: String {
-        engine.statusMessage
+        localizedStatus(engine.statusMessage)
     }
 
     private var statusColor: Color {
-        if !engine.errorMessage.isEmpty { return .red }
-        if engine.isRecovering { return .orange }
+        if engine.isPaused { return .orange }
         if engine.isSending || engine.isPlaying { return .green }
-        if engine.isListening { return .orange }
-        return .gray
+        return .red
+    }
+
+    private func localizedStatus(_ status: String) -> String {
+        switch status {
+        case "Starting": return "正在启动"
+        case "Paused": return "已暂停"
+        case "Waiting for Windows audio": return "等待 Windows 音频"
+        case "Starting system-audio capture": return "正在启动系统音频采集"
+        case "Recovering Mac audio output", "Recovering audio output":
+            return "正在恢复 Mac 音频输出"
+        case "Sending Mac audio to Windows": return "正在向 Windows 发送 Mac 音频"
+        case "Connected · Mac audio is silent": return "已连接 · Mac 当前静音"
+        case "Playing Windows audio": return "正在播放 Windows 音频"
+        case "Connected · incoming audio is silent": return "已连接 · 传入音频静音"
+        case "Preparing Mac audio output": return "正在准备 Mac 音频输出"
+        default:
+            let prefix = "Recovering · "
+            guard status.hasPrefix(prefix) else { return status }
+            let reason = String(status.dropFirst(prefix.count))
+            return "正在恢复 · \(localizedRecoveryReason(reason))"
+        }
+    }
+
+    private func localizedRecoveryReason(_ reason: String) -> String {
+        switch reason {
+        case "Destination changed": return "目标地址已更改"
+        case "Mac output device changed": return "Mac 输出设备已更改"
+        case "System-audio capture stalled": return "系统音频采集已停止响应"
+        case "UDP sender failed": return "UDP 发送失败"
+        default: return reason
+        }
     }
 }
