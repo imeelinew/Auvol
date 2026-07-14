@@ -101,6 +101,11 @@ namespace winrt::Auvol::implementation
                 dispatcher.TryEnqueue([weak, running] {
                     if (const auto self = weak.get()) self->UpdateRunning(running);
                 });
+            },
+            [dispatcher, weak](int mode) {
+                dispatcher.TryEnqueue([weak, mode] {
+                    if (const auto self = weak.get()) self->UpdateMode(mode);
+                });
             });
     }
 
@@ -120,6 +125,7 @@ namespace winrt::Auvol::implementation
         PeerIpTextBox().Text(winrt::to_hstring(peer));
         SendModeButton().IsChecked(m_mode == 0);
         ReceiveModeButton().IsChecked(m_mode == 1);
+        auvol::StartDirectionControl(peer);
 
         if ((!commandPeer.empty() || settings.running) && PeerAddressIsValid()) {
             auvol::Start(PeerAddress(), m_mode);
@@ -166,6 +172,9 @@ namespace winrt::Auvol::implementation
     void MainWindow::PeerIpTextBox_TextChanged(IInspectable const&,
         TextChangedEventArgs const&)
     {
+        if (PeerAddressIsValid()) {
+            auvol::SetDirectionControlPeer(PeerAddress());
+        }
         if (!m_running) {
             TransportButton().IsEnabled(PeerAddressIsValid());
         }
@@ -225,6 +234,16 @@ namespace winrt::Auvol::implementation
             winrt::box_value(running ? L"SystemFillColorSuccessBrush" :
                                       L"TextFillColorTertiaryBrush")).as<Brush>());
         if (!running) ResetStats();
+    }
+
+    void MainWindow::UpdateMode(int mode)
+    {
+        m_mode = mode == 1 ? 1 : 0;
+        SendModeButton().IsChecked(m_mode == 0);
+        ReceiveModeButton().IsChecked(m_mode == 1);
+        RateLabel().Text(m_mode == 0 ? L"CAPTURE · FRAMES/S" : L"RENDER · FRAMES/S");
+        ResetStats();
+        auvol::SaveSettings(PeerAddress(), m_mode, m_running);
     }
 
     void MainWindow::ResetStats()

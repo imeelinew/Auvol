@@ -23,6 +23,7 @@
 #include <cstring>
 #include <functional>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <thread>
 #include <vector>
@@ -74,6 +75,7 @@ static std::mutex g_callbackMutex;
 static auvol::TextCallback g_statusCallback;
 static auvol::TextCallback g_statsCallback;
 static auvol::RunningCallback g_runningCallback;
+static auvol::ModeCallback g_modeCallback;
 
 static bool SessionCurrent(UINT64 generation, int mode) {
     return g_running.load(std::memory_order_acquire) &&
@@ -227,6 +229,20 @@ static void NotifyRunning(bool running) {
     if (callback) callback(running);
 }
 
+static void NotifyMode(int mode) {
+    auvol::ModeCallback callback;
+    {
+        std::lock_guard<std::mutex> lock(g_callbackMutex);
+        callback = g_modeCallback;
+    }
+    if (callback) {
+        callback(mode);
+    } else if (g_mainWindow) {
+        PostMessageW(g_mainWindow, WM_APP + 5,
+                     static_cast<WPARAM>(mode), 0);
+    }
+}
+
 static void PostStatus(const std::string& text) {
     PostText(WM_APP + 1, "Status: " + text);
 }
@@ -251,6 +267,360 @@ static UINT32 NewStreamID() {
     UINT32 value = counter.LowPart ^ counter.HighPart ^
                    GetCurrentProcessId() ^ GetTickCount();
     return value == 0 ? 1 : value;
+}
+
+static constexpr UINT32 DIRECTION_MAGIC = 0x31434c41u; // Wire bytes: ALC1
+static constexpr UINT8 DIRECTION_SET = 1;
+static constexpr UINT8 DIRECTION_ACK = 2;
+static constexpr UINT16 DIRECTION_PORT = 7778;
+static constexpr size_t DIRECTION_PACKET_BYTES = 24;
+
+struct DirectionState {
+    UINT64 version = 0;
+    UINT64 originID = 0;
+    UINT8 direction = 0;
+};
+
+static bool DirectionOutranks(const DirectionState& left,
+                              const DirectionState& right) {
+    return left.version != right.version
+        ? left.version > right.version
+        : left.originID > right.originID;
+}
+
+static bool DirectionSameKey(const DirectionState& left,
+                             const DirectionState& right) {
+    return left.version == right.version && left.originID == right.originID;
+}
+
+static std::mutex g_directionMutex;
+static std::string g_directionPeerIP;
+static bool g_directionStateLoaded = false;
+static UINT64 g_directionDeviceID = 0;
+static UINT64 g_directionClock = 0;
+static DirectionState g_directionWinner;
+static std::optional<DirectionState> g_directionPending;
+static unsigned g_directionAttemptsSent = 0;
+static std::chrono::steady_clock::time_point g_directionNextSend;
+static std::atomic<bool> g_directionControlRunning{false};
+static std::atomic<SOCKET> g_directionSocket{INVALID_SOCKET};
+static std::thread g_directionThread;
+
+static void ApplySynchronizedMode(int mode);
+
+static UINT64 GenerateDirectionDeviceID() {
+    GUID guid = {};
+    UINT64 first = 0;
+    UINT64 second = 0;
+    if (SUCCEEDED(CoCreateGuid(&guid))) {
+        static_assert(sizeof(guid) == sizeof(first) + sizeof(second));
+        memcpy(&first, &guid, sizeof(first));
+        memcpy(&second, reinterpret_cast<const BYTE*>(&guid) + sizeof(first),
+               sizeof(second));
+    } else {
+        LARGE_INTEGER counter = {};
+        QueryPerformanceCounter(&counter);
+        first = static_cast<UINT64>(counter.QuadPart);
+        second = GetTickCount64() ^ static_cast<UINT64>(GetCurrentProcessId());
+    }
+    const UINT64 value = first ^ second;
+    return value == 0 ? 1 : value;
+}
+
+static UINT64 ReadUserQword(HKEY key, const wchar_t* name) {
+    UINT64 value = 0;
+    DWORD type = 0;
+    DWORD size = sizeof(value);
+    return RegQueryValueExW(key, name, nullptr, &type,
+                            reinterpret_cast<BYTE*>(&value), &size) == ERROR_SUCCESS &&
+           type == REG_QWORD
+        ? value : 0;
+}
+
+static void WriteUserQword(HKEY key, const wchar_t* name, UINT64 value) {
+    RegSetValueExW(key, name, 0, REG_QWORD,
+                   reinterpret_cast<const BYTE*>(&value), sizeof(value));
+}
+
+static void PersistDirectionStateLocked() {
+    HKEY key = nullptr;
+    if (RegCreateKeyExW(HKEY_CURRENT_USER, L"Software\\Auvol", 0, nullptr, 0,
+                        KEY_SET_VALUE, nullptr, &key, nullptr) != ERROR_SUCCESS) {
+        return;
+    }
+    WriteUserQword(key, L"ControlDeviceID", g_directionDeviceID);
+    WriteUserQword(key, L"ControlClock", g_directionClock);
+    WriteUserQword(key, L"ControlWinnerVersion", g_directionWinner.version);
+    WriteUserQword(key, L"ControlWinnerOrigin", g_directionWinner.originID);
+    const DWORD direction = g_directionWinner.direction;
+    RegSetValueExW(key, L"ControlWinnerDirection", 0, REG_DWORD,
+                   reinterpret_cast<const BYTE*>(&direction), sizeof(direction));
+    RegCloseKey(key);
+}
+
+static void EnsureDirectionStateLoadedLocked() {
+    if (g_directionStateLoaded) return;
+    g_directionStateLoaded = true;
+    g_directionWinner.direction = g_savedMode == 1 ? 1 : 0;
+
+    HKEY key = nullptr;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Auvol", 0,
+                      KEY_QUERY_VALUE, &key) == ERROR_SUCCESS) {
+        g_directionDeviceID = ReadUserQword(key, L"ControlDeviceID");
+        g_directionClock = ReadUserQword(key, L"ControlClock");
+        g_directionWinner.version = ReadUserQword(key, L"ControlWinnerVersion");
+        g_directionWinner.originID = ReadUserQword(key, L"ControlWinnerOrigin");
+        DWORD direction = g_directionWinner.direction;
+        DWORD type = 0;
+        DWORD size = sizeof(direction);
+        if (RegQueryValueExW(key, L"ControlWinnerDirection", nullptr, &type,
+                             reinterpret_cast<BYTE*>(&direction), &size) == ERROR_SUCCESS &&
+            type == REG_DWORD && direction <= 1 && g_directionWinner.version > 0) {
+            g_directionWinner.direction = static_cast<UINT8>(direction);
+        }
+        RegCloseKey(key);
+    }
+    if (g_directionDeviceID == 0) {
+        g_directionDeviceID = GenerateDirectionDeviceID();
+    }
+    g_directionClock = std::max(g_directionClock, g_directionWinner.version);
+    PersistDirectionStateLocked();
+}
+
+static bool DirectionAddress(const std::string& peerIP,
+                             sockaddr_in* address) {
+    if (!address) return false;
+    *address = {};
+    address->sin_family = AF_INET;
+    address->sin_port = htons(DIRECTION_PORT);
+    return inet_pton(AF_INET, peerIP.c_str(), &address->sin_addr) == 1;
+}
+
+static bool DirectionSourceMatchesPeer(const sockaddr_in& source) {
+    std::string peerIP;
+    {
+        std::lock_guard<std::mutex> lock(g_directionMutex);
+        peerIP = g_directionPeerIP;
+    }
+    sockaddr_in peer = {};
+    return DirectionAddress(peerIP, &peer) &&
+           source.sin_addr.s_addr == peer.sin_addr.s_addr;
+}
+
+static std::array<UINT8, DIRECTION_PACKET_BYTES> DirectionPacket(
+    UINT8 type, const DirectionState& state) {
+    std::array<UINT8, DIRECTION_PACKET_BYTES> packet = {};
+    Put32(packet.data(), DIRECTION_MAGIC);
+    packet[4] = type;
+    packet[5] = state.direction;
+    Put64(packet.data() + 8, state.version);
+    Put64(packet.data() + 16, state.originID);
+    return packet;
+}
+
+static bool ParseDirectionPacket(const UINT8* bytes, int length,
+                                 UINT8* type, DirectionState* state) {
+    if (!bytes || !type || !state || length != DIRECTION_PACKET_BYTES ||
+        Get32(bytes) != DIRECTION_MAGIC ||
+        (bytes[4] != DIRECTION_SET && bytes[4] != DIRECTION_ACK) ||
+        bytes[5] > 1 || bytes[6] != 0 || bytes[7] != 0) {
+        return false;
+    }
+    *type = bytes[4];
+    state->direction = bytes[5];
+    state->version = Get64(bytes + 8);
+    state->originID = Get64(bytes + 16);
+    return state->version != 0 && state->originID != 0;
+}
+
+static void SendDirectionState(SOCKET socketFD, UINT8 type,
+                               const DirectionState& state,
+                               const sockaddr_in& destination) {
+    const auto packet = DirectionPacket(type, state);
+    sendto(socketFD, reinterpret_cast<const char*>(packet.data()),
+           static_cast<int>(packet.size()), 0,
+           reinterpret_cast<const sockaddr*>(&destination),
+           sizeof(destination));
+}
+
+static void PublishDirection(int mode) {
+    std::lock_guard<std::mutex> lock(g_directionMutex);
+    EnsureDirectionStateLoadedLocked();
+    g_directionClock = std::max(g_directionClock, g_directionWinner.version) + 1;
+    if (g_directionClock == 0) g_directionClock = 1;
+    g_directionWinner = {
+        g_directionClock,
+        g_directionDeviceID,
+        static_cast<UINT8>(mode == 1 ? 1 : 0)
+    };
+    g_directionPending = g_directionWinner;
+    g_directionAttemptsSent = 0;
+    g_directionNextSend = std::chrono::steady_clock::now();
+    PersistDirectionStateLocked();
+}
+
+static void MaybeSendPendingDirection(SOCKET socketFD) {
+    std::optional<DirectionState> state;
+    std::string peerIP;
+    const auto now = std::chrono::steady_clock::now();
+    {
+        std::lock_guard<std::mutex> lock(g_directionMutex);
+        if (!g_directionPending || now < g_directionNextSend) return;
+        if (g_directionAttemptsSent >= 4) {
+            g_directionPending.reset();
+            return;
+        }
+        state = g_directionPending;
+        peerIP = g_directionPeerIP;
+        static constexpr std::chrono::milliseconds delays[] = {
+            std::chrono::milliseconds(150),
+            std::chrono::milliseconds(400),
+            std::chrono::milliseconds(900),
+            std::chrono::milliseconds(1000)
+        };
+        g_directionNextSend = now + delays[g_directionAttemptsSent];
+        ++g_directionAttemptsSent;
+    }
+    sockaddr_in destination = {};
+    if (state && DirectionAddress(peerIP, &destination)) {
+        SendDirectionState(socketFD, DIRECTION_SET, *state, destination);
+    }
+}
+
+static void ReceiveDirectionPacket(SOCKET socketFD, const UINT8* bytes,
+                                   int length, const sockaddr_in& source) {
+    if (!DirectionSourceMatchesPeer(source)) return;
+    UINT8 type = 0;
+    DirectionState incoming;
+    if (!ParseDirectionPacket(bytes, length, &type, &incoming)) return;
+
+    bool applyDirection = false;
+    DirectionState response;
+    {
+        std::lock_guard<std::mutex> lock(g_directionMutex);
+        EnsureDirectionStateLoadedLocked();
+        bool changed = false;
+        if (incoming.version > g_directionClock) {
+            g_directionClock = incoming.version;
+            changed = true;
+        }
+        if (DirectionOutranks(incoming, g_directionWinner)) {
+            g_directionWinner = incoming;
+            applyDirection = true;
+            changed = true;
+            if (g_directionPending &&
+                DirectionOutranks(incoming, *g_directionPending)) {
+                g_directionPending.reset();
+            }
+        }
+        if (type == DIRECTION_ACK && g_directionPending &&
+            (DirectionSameKey(incoming, *g_directionPending) ||
+             DirectionOutranks(incoming, *g_directionPending))) {
+            g_directionPending.reset();
+        }
+        if (changed) PersistDirectionStateLocked();
+        response = g_directionWinner;
+    }
+
+    if (applyDirection) {
+        ApplySynchronizedMode(incoming.direction == 1 ? 1 : 0);
+    }
+    if (type == DIRECTION_SET) {
+        SendDirectionState(socketFD, DIRECTION_ACK, response, source);
+    }
+}
+
+static void DirectionControlThread() {
+    WSADATA winsock = {};
+    if (WSAStartup(MAKEWORD(2, 2), &winsock) != 0) {
+        PostStatus("Direction control could not initialize Winsock");
+        g_directionControlRunning.store(false, std::memory_order_release);
+        return;
+    }
+
+    SOCKET socketFD = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (socketFD == INVALID_SOCKET) {
+        PostStatus("Direction control socket could not be opened");
+        g_directionControlRunning.store(false, std::memory_order_release);
+        WSACleanup();
+        return;
+    }
+    BOOL exclusive = TRUE;
+    setsockopt(socketFD, SOL_SOCKET, SO_EXCLUSIVEADDRUSE,
+               reinterpret_cast<const char*>(&exclusive), sizeof(exclusive));
+    sockaddr_in local = {};
+    local.sin_family = AF_INET;
+    local.sin_port = htons(DIRECTION_PORT);
+    local.sin_addr.s_addr = htonl(INADDR_ANY);
+    if (bind(socketFD, reinterpret_cast<const sockaddr*>(&local),
+             sizeof(local)) == SOCKET_ERROR) {
+        closesocket(socketFD);
+        PostStatus("Direction control UDP port 7778 is unavailable");
+        g_directionControlRunning.store(false, std::memory_order_release);
+        WSACleanup();
+        return;
+    }
+    u_long nonblocking = 1;
+    ioctlsocket(socketFD, FIONBIO, &nonblocking);
+    g_directionSocket.store(socketFD, std::memory_order_release);
+
+    while (g_directionControlRunning.load(std::memory_order_acquire)) {
+        MaybeSendPendingDirection(socketFD);
+        fd_set readable;
+        FD_ZERO(&readable);
+        FD_SET(socketFD, &readable);
+        timeval timeout = {0, 50000};
+        const int selected = select(0, &readable, nullptr, nullptr, &timeout);
+        if (selected == SOCKET_ERROR) {
+            if (!g_directionControlRunning.load(std::memory_order_acquire)) break;
+            Sleep(50);
+            continue;
+        }
+        if (selected <= 0 || !FD_ISSET(socketFD, &readable)) continue;
+
+        while (true) {
+            std::array<UINT8, 64> bytes = {};
+            sockaddr_in source = {};
+            int sourceBytes = sizeof(source);
+            const int count = recvfrom(socketFD,
+                reinterpret_cast<char*>(bytes.data()),
+                static_cast<int>(bytes.size()), 0,
+                reinterpret_cast<sockaddr*>(&source), &sourceBytes);
+            if (count == SOCKET_ERROR) {
+                if (WSAGetLastError() == WSAEWOULDBLOCK) break;
+                break;
+            }
+            ReceiveDirectionPacket(socketFD, bytes.data(), count, source);
+        }
+    }
+
+    SOCKET expected = socketFD;
+    if (g_directionSocket.compare_exchange_strong(expected, INVALID_SOCKET,
+                                                   std::memory_order_acq_rel)) {
+        closesocket(socketFD);
+    }
+    WSACleanup();
+}
+
+static void StopDirectionControl() {
+    g_directionControlRunning.store(false, std::memory_order_release);
+    const SOCKET socketFD = g_directionSocket.exchange(
+        INVALID_SOCKET, std::memory_order_acq_rel);
+    if (socketFD != INVALID_SOCKET) closesocket(socketFD);
+    if (g_directionThread.joinable()) g_directionThread.join();
+}
+
+static void ApplySynchronizedMode(int mode) {
+    const int normalized = mode == 1 ? 1 : 0;
+    const int previous = g_desiredMode.exchange(normalized,
+                                                 std::memory_order_acq_rel);
+    if (previous != normalized &&
+        g_connected.load(std::memory_order_acquire)) {
+        g_controlGeneration.fetch_add(1, std::memory_order_acq_rel);
+        if (g_controlEvent) SetEvent(g_controlEvent);
+        PostStatus("Switching direction from peer...");
+    }
+    NotifyMode(normalized);
 }
 
 class DatagramSender {
@@ -1462,11 +1832,13 @@ namespace auvol {
 
 void SetCallbacks(TextCallback status,
                   TextCallback stats,
-                  RunningCallback running) {
+                  RunningCallback running,
+                  ModeCallback mode) {
     std::lock_guard<std::mutex> lock(g_callbackMutex);
     g_statusCallback = std::move(status);
     g_statsCallback = std::move(stats);
     g_runningCallback = std::move(running);
+    g_modeCallback = std::move(mode);
 }
 
 Settings LoadSettings() {
@@ -1502,10 +1874,29 @@ std::string CommandLinePeer(int* mode) {
     return peer;
 }
 
+void SetDirectionControlPeer(const std::string& peerIP) {
+    std::lock_guard<std::mutex> lock(g_directionMutex);
+    g_directionPeerIP = peerIP;
+}
+
+void StartDirectionControl(const std::string& peerIP) {
+    SetDirectionControlPeer(peerIP);
+    if (g_directionControlRunning.exchange(true, std::memory_order_acq_rel)) {
+        return;
+    }
+    if (g_directionThread.joinable()) g_directionThread.join();
+    {
+        std::lock_guard<std::mutex> lock(g_directionMutex);
+        EnsureDirectionStateLoadedLocked();
+    }
+    g_directionThread = std::thread(DirectionControlThread);
+}
+
 bool Start(const std::string& peerIP, int mode) {
     if (peerIP.empty() || g_connected.load(std::memory_order_acquire)) {
         return false;
     }
+    StartDirectionControl(peerIP);
     if (!g_controlEvent) {
         g_controlEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
         if (!g_controlEvent) return false;
@@ -1546,6 +1937,7 @@ void SwitchMode(int mode) {
         if (g_controlEvent) SetEvent(g_controlEvent);
         PostStatus("Switching direction automatically...");
     }
+    PublishDirection(normalized);
 }
 
 bool IsRunning() {
@@ -1554,11 +1946,13 @@ bool IsRunning() {
 
 void Shutdown() {
     Stop();
+    StopDirectionControl();
     {
         std::lock_guard<std::mutex> lock(g_callbackMutex);
         g_statusCallback = {};
         g_statsCallback = {};
         g_runningCallback = {};
+        g_modeCallback = {};
     }
     if (g_controlEvent) {
         CloseHandle(g_controlEvent);
@@ -1616,6 +2010,7 @@ static LRESULT CALLBACK WindowProcedure(HWND window,
                                      window, reinterpret_cast<HMENU>(105),
                                      nullptr, nullptr);
         SendMessageW(g_ipEdit, EM_SETLIMITTEXT, 45, 0);
+        auvol::StartDirectionControl(g_savedIP);
         if (!g_autoConnectIP.empty()) {
             SetWindowTextA(g_ipEdit, g_autoConnectIP.c_str());
             SendMessageW(g_modeCombo, CB_SETCURSEL, g_autoMode, 0);
@@ -1690,6 +2085,11 @@ static LRESULT CALLBACK WindowProcedure(HWND window,
                      reinterpret_cast<LPARAM>(g_connectButton));
         return 0;
 
+    case WM_APP + 5:
+        SendMessageW(g_modeCombo, CB_SETCURSEL, wParam == 1 ? 1 : 0, 0);
+        SaveUserSettings(g_connected.load(std::memory_order_acquire));
+        return 0;
+
     case WM_CLOSE:
         SaveUserSettings(false);
         g_running.store(false, std::memory_order_release);
@@ -1762,6 +2162,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int showCommand) {
         TranslateMessage(&message);
         DispatchMessageW(&message);
     }
+    StopDirectionControl();
     CloseHandle(g_controlEvent);
     g_controlEvent = nullptr;
     ReleaseMutex(singleInstance);

@@ -61,3 +61,36 @@ IP/UDP headers. Packets therefore do not rely on IP fragmentation.
 - `first_frame` detects missing, duplicate and stale audio independently of UDP
   sequence wrap. Small losses are replaced with silence; a large discontinuity
   causes a clean re-prime instead of playing stale audio.
+
+## Direction control channel
+
+Direction changes use a separate always-on UDP control channel on port 7778.
+The control channel remains available while audio transport is paused or idle;
+it never carries audio and does not alter the ALV2 packets on port 7777.
+
+Every control datagram is exactly 24 bytes. All multi-byte integers are unsigned
+little-endian. The four wire bytes `41 4c 43 31` spell `ALC1`.
+
+| Offset | Size | Field | Description |
+|---:|---:|---|---|
+| 0 | 4 | magic | `ALC1` |
+| 4 | 1 | type | `1` set direction, `2` acknowledgement |
+| 5 | 1 | direction | `0` Windows → Mac, `1` Mac → Windows |
+| 6 | 2 | reserved | Zero |
+| 8 | 8 | version | Lamport version incremented for each local change |
+| 16 | 8 | origin_id | Stable random identifier of the device that created the change |
+
+Both applications listen continuously and accept packets only from their
+configured peer address. A local direction selection creates a new state,
+applies it locally, sends `set direction`, and retries briefly until an
+acknowledgement arrives. The peer applies the complementary local role and
+returns an acknowledgement without broadcasting another change.
+
+States are ordered lexicographically by `(version, origin_id)`. Each receiver
+advances its Lamport clock when it sees a newer version. If both devices change
+direction at nearly the same time, this ordering selects one deterministic
+winner; an acknowledgement advertises the receiver's winning state so both
+devices converge. Duplicate packets are idempotent.
+
+Direction synchronization never changes the paused/running state. A paused app
+updates its selected direction but remains paused until the user resumes it.

@@ -49,7 +49,7 @@ $ruleName = "Auvol LAN Audio"
 Get-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContinue |
   Remove-NetFirewallRule
 New-NetFirewallRule -DisplayName $ruleName -Direction Inbound -Action Allow `
-  -Program $executable -Protocol UDP -LocalPort 7777 -RemoteAddress LocalSubnet `
+  -Program $executable -Protocol UDP -LocalPort 7777,7778 -RemoteAddress LocalSubnet `
   -Profile Any | Out-Null
 
 $service = New-Object -ComObject "Schedule.Service"

@@ -39,7 +39,7 @@ struct StatusView: View {
     private var roleControl: some View {
         Picker("传输方向", selection: Binding(
             get: { engine.role },
-            set: { engine.activate($0) }
+            set: { engine.selectRole($0) }
         )) {
             ForEach(TransportRole.allCases, id: \.self) { role in
                 Text(role == .receive ? "从 Windows 接收" : "发送到 Windows")

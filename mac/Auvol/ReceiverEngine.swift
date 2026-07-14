@@ -56,6 +56,7 @@ final class ReceiverEngine: ObservableObject {
     private let lifecycleLock = NSLock()
     private let player = AudioPlayer()
     private let sender = AudioSender()
+    private var directionControl: DirectionControlChannel?
     private var network: NetworkReceiver?
     private var statsTimer: Timer?
     private var recoveryWorkItem: DispatchWorkItem?
@@ -106,6 +107,19 @@ final class ReceiverEngine: ObservableObject {
         targetBufferMs = min(80, max(8, saved ?? Self.defaultTargetBufferMs))
         peerIP = initialPeerIP ?? UserDefaults.standard.string(forKey: Self.peerIPKey) ?? peerIP
         player.setTargetBufferMs(targetBufferMs)
+
+        let control = DirectionControlChannel(
+            peerIP: peerIP,
+            initialDirection: selectedRole == .receive ? .windowsToMac : .macToWindows
+        )
+        control.onDirection = { [weak self] direction in
+            self?.applyRemoteDirection(direction)
+        }
+        if let error = control.start() {
+            logger.warning("direction control unavailable: \(error, privacy: .public)")
+        }
+        directionControl = control
+
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.activate(self.initialRole)
@@ -113,6 +127,15 @@ final class ReceiverEngine: ObservableObject {
     }
 
     var isActive: Bool { !isPaused }
+
+    func selectRole(_ newRole: TransportRole) {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in self?.selectRole(newRole) }
+            return
+        }
+        applyRolePreservingPause(newRole)
+        directionControl?.publish(newRole == .receive ? .windowsToMac : .macToWindows)
+    }
 
     func start() {
         guard Thread.isMainThread else {
@@ -129,7 +152,7 @@ final class ReceiverEngine: ObservableObject {
         player.setTargetBufferMs(clamped)
     }
 
-    /// Selecting a direction always activates it; Stop is only a total pause.
+    /// Starts or resumes transport in the selected direction.
     func activate(_ newRole: TransportRole) {
         guard Thread.isMainThread else {
             DispatchQueue.main.async { [weak self] in self?.activate(newRole) }
@@ -153,6 +176,7 @@ final class ReceiverEngine: ObservableObject {
     func setPeerIP(_ value: String) {
         peerIP = value
         UserDefaults.standard.set(value, forKey: Self.peerIPKey)
+        directionControl?.setPeerIP(value)
         peerChangeWorkItem?.cancel()
         guard role == .send, !isPaused else { return }
         let generation = currentGeneration()
@@ -191,6 +215,25 @@ final class ReceiverEngine: ObservableObject {
             startReceiver(generation: generation)
         case .send:
             startSender(generation: generation)
+        }
+    }
+
+    private func applyRemoteDirection(_ direction: SynchronizedDirection) {
+        let newRole: TransportRole = direction == .windowsToMac ? .receive : .send
+        guard newRole != role else { return }
+        applyRolePreservingPause(newRole)
+    }
+
+    private func applyRolePreservingPause(_ newRole: TransportRole) {
+        if isPaused {
+            recoveryWorkItem?.cancel()
+            peerChangeWorkItem?.cancel()
+            role = newRole
+            UserDefaults.standard.set(newRole.rawValue, forKey: Self.roleKey)
+            _ = setDesiredState(role: newRole, paused: true)
+            statusMessage = "Paused"
+        } else {
+            activate(newRole)
         }
     }
 
@@ -648,6 +691,7 @@ final class ReceiverEngine: ObservableObject {
         recoveryWorkItem?.cancel()
         peerChangeWorkItem?.cancel()
         statsTimer?.invalidate()
+        directionControl?.stop()
         network?.stop()
         player.stop()
         sender.stop()

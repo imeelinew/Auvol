@@ -27,6 +27,7 @@ namespace winrt::Auvol::implementation
         void UpdateStatus(std::string const& text);
         void UpdateStats(std::string const& text);
         void UpdateRunning(bool running);
+        void UpdateMode(int mode);
         void ResetStats();
         bool PeerAddressIsValid();
         std::string PeerAddress();
