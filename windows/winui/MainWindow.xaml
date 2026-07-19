@@ -5,168 +5,324 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
-    Title="Auvol — Audio Transport">
+    Title="Auvol">
 
     <Window.SystemBackdrop>
-        <MicaBackdrop />
+        <MicaBackdrop Kind="Base" />
     </Window.SystemBackdrop>
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <Grid Padding="32,28,32,32" RowSpacing="20">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
 
-            <Grid Grid.Row="0" ColumnSpacing="16">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <Border Width="52" Height="52" CornerRadius="14"
-                        Background="{ThemeResource AccentFillColorDefaultBrush}">
-                    <FontIcon Glyph="&#xE767;" FontSize="25" Foreground="White" />
-                </Border>
-                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
-                    <TextBlock Text="Auvol" Style="{ThemeResource TitleTextBlockStyle}" />
-                    <TextBlock Text="Low-latency audio over your local network"
-                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+        <TitleBar x:Name="AppTitleBar"
+                  Title="Auvol">
+            <TitleBar.IconSource>
+                <ImageIconSource ImageSource="ms-appx:///Assets/Auvol.png" />
+            </TitleBar.IconSource>
+        </TitleBar>
+
+        <ScrollViewer Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <Grid MaxWidth="960"
+                  Padding="40,28,40,40"
+                  HorizontalAlignment="Stretch">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0" Spacing="4" Margin="0,0,0,28">
+                    <TextBlock Text="Auvol"
+                               Style="{ThemeResource TitleTextBlockStyle}" />
+                    <TextBlock Text="通过局域网在 Windows 与 Mac 之间传输系统音频。"
+                               Style="{ThemeResource BodyTextBlockStyle}"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               TextWrapping="Wrap" />
                 </StackPanel>
-                <Border Grid.Column="2" Padding="12,7" CornerRadius="16"
-                        VerticalAlignment="Center"
-                        Background="{ThemeResource ControlFillColorSecondaryBrush}">
-                    <StackPanel Orientation="Horizontal" Spacing="7">
-                        <Ellipse x:Name="StateDot" Width="8" Height="8"
-                                 Fill="{ThemeResource TextFillColorTertiaryBrush}" />
-                        <TextBlock x:Name="ConnectionStateText" Text="Idle"
-                                   FontWeight="SemiBold" />
+
+                <TextBlock Grid.Row="1"
+                           Text="连接"
+                           Style="{ThemeResource SubtitleTextBlockStyle}"
+                           Margin="0,0,0,12" />
+
+                <Border Grid.Row="2"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Margin="0,0,0,28">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="1" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <Grid Padding="16" ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="240" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE968;"
+                                      FontSize="20"
+                                      VerticalAlignment="Center"
+                                      Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <StackPanel Grid.Column="1"
+                                        VerticalAlignment="Center"
+                                        Spacing="2">
+                                <TextBlock Text="对端设备"
+                                           Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                                <TextBlock Text="Mac 在局域网中的 IP 地址"
+                                           Style="{ThemeResource CaptionTextBlockStyle}"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <TextBox x:Name="PeerIpTextBox"
+                                     Grid.Column="2"
+                                     VerticalAlignment="Center"
+                                     PlaceholderText="192.168.101.162"
+                                     AutomationProperties.AutomationId="PeerIpAddress"
+                                     TextChanged="PeerIpTextBox_TextChanged" />
+                        </Grid>
+
+                        <Border Grid.Row="1"
+                                Background="{ThemeResource CardStrokeColorDefaultBrush}" />
+
+                        <Grid Grid.Row="2" Padding="16" ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE774;"
+                                      FontSize="20"
+                                      VerticalAlignment="Center"
+                                      Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <StackPanel Grid.Column="1"
+                                        VerticalAlignment="Center"
+                                        Spacing="2">
+                                <TextBlock Text="连接状态"
+                                           Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                                <TextBlock Text="当前音频链路状态"
+                                           Style="{ThemeResource CaptionTextBlockStyle}"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2"
+                                        Orientation="Horizontal"
+                                        VerticalAlignment="Center"
+                                        Spacing="8">
+                                <Ellipse x:Name="StateDot"
+                                         Width="8"
+                                         Height="8"
+                                         Fill="{ThemeResource TextFillColorTertiaryBrush}" />
+                                <TextBlock x:Name="ConnectionStateText"
+                                           Text="空闲"
+                                           Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <TextBlock Grid.Row="3"
+                           Text="音频传输"
+                           Style="{ThemeResource SubtitleTextBlockStyle}"
+                           Margin="0,0,0,12" />
+
+                <Border Grid.Row="4"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="1" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <Grid Padding="16" ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE8AB;"
+                                      FontSize="20"
+                                      VerticalAlignment="Center"
+                                      Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <StackPanel Grid.Column="1"
+                                        VerticalAlignment="Center"
+                                        Spacing="2">
+                                <TextBlock Text="传输方向"
+                                           Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                                <TextBlock Text="选择由哪台设备采集、哪台设备播放"
+                                           Style="{ThemeResource CaptionTextBlockStyle}"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <Grid Grid.Column="2" ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ToggleButton x:Name="SendModeButton"
+                                              Grid.Column="0"
+                                              MinWidth="148"
+                                              IsChecked="True"
+                                              Click="DirectionButton_Click"
+                                              AutomationProperties.AutomationId="SendToMac">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE72A;" FontSize="16" />
+                                        <TextBlock Text="Windows → Mac" />
+                                    </StackPanel>
+                                </ToggleButton>
+                                <ToggleButton x:Name="ReceiveModeButton"
+                                              Grid.Column="1"
+                                              MinWidth="148"
+                                              Click="DirectionButton_Click"
+                                              AutomationProperties.AutomationId="ReceiveFromMac">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE896;" FontSize="16" />
+                                        <TextBlock Text="Mac → Windows" />
+                                    </StackPanel>
+                                </ToggleButton>
+                            </Grid>
+                        </Grid>
+
+                        <Border Grid.Row="1"
+                                Background="{ThemeResource CardStrokeColorDefaultBrush}" />
+
+                        <Grid Grid.Row="2" Padding="16" ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE768;"
+                                      FontSize="20"
+                                      VerticalAlignment="Center"
+                                      Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <StackPanel Grid.Column="1"
+                                        VerticalAlignment="Center"
+                                        Spacing="2">
+                                <TextBlock Text="传输控制"
+                                           Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                                <TextBlock Text="开始或暂停音频传输，现有配置保持不变"
+                                           Style="{ThemeResource CaptionTextBlockStyle}"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <Button x:Name="TransportButton"
+                                    Grid.Column="2"
+                                    MinWidth="136"
+                                    HorizontalContentAlignment="Center"
+                                    Style="{ThemeResource AccentButtonStyle}"
+                                    Content="开始传输"
+                                    Click="TransportButton_Click"
+                                    AutomationProperties.AutomationId="TransportToggle" />
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <InfoBar x:Name="TransportInfoBar"
+                         Grid.Row="5"
+                         Margin="0,12,0,28"
+                         IsOpen="True"
+                         IsClosable="False"
+                         Severity="Informational"
+                         Title="就绪"
+                         Message="选择传输方向，然后开始传输。" />
+
+                <TextBlock Grid.Row="6"
+                           Text="运行状态"
+                           Style="{ThemeResource SubtitleTextBlockStyle}"
+                           Margin="0,0,0,12" />
+
+                <Expander Grid.Row="7"
+                          Header="实时传输详情"
+                          IsExpanded="True"
+                          HorizontalAlignment="Stretch"
+                          HorizontalContentAlignment="Stretch">
+                    <StackPanel>
+                        <Grid Padding="16,12" ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="数据包"
+                                       Style="{ThemeResource BodyTextBlockStyle}" />
+                            <TextBlock x:Name="PacketsValue"
+                                       Grid.Column="1"
+                                       Text="0"
+                                       Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                        </Grid>
+                        <Border Height="1"
+                                Background="{ThemeResource CardStrokeColorDefaultBrush}" />
+                        <Grid Padding="16,12" ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="信号（dBFS）"
+                                       Style="{ThemeResource BodyTextBlockStyle}" />
+                            <TextBlock x:Name="SignalValue"
+                                       Grid.Column="1"
+                                       Text="—"
+                                       Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                        </Grid>
+                        <Border Height="1"
+                                Background="{ThemeResource CardStrokeColorDefaultBrush}" />
+                        <Grid Padding="16,12" ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="RateLabel"
+                                       Text="采集速率（帧/秒）"
+                                       Style="{ThemeResource BodyTextBlockStyle}" />
+                            <TextBlock x:Name="RateValue"
+                                       Grid.Column="1"
+                                       Text="—"
+                                       Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                        </Grid>
+                        <Border Height="1"
+                                Background="{ThemeResource CardStrokeColorDefaultBrush}" />
+                        <Grid Padding="16,12" ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="传输质量"
+                                       Style="{ThemeResource BodyTextBlockStyle}" />
+                            <TextBlock x:Name="QualityValue"
+                                       Grid.Column="1"
+                                       Text="—"
+                                       Style="{ThemeResource BodyStrongTextBlockStyle}"
+                                       TextWrapping="Wrap" />
+                        </Grid>
+                        <Border Height="1"
+                                Background="{ThemeResource CardStrokeColorDefaultBrush}" />
+                        <TextBlock x:Name="RawStatsText"
+                                   Padding="16,12"
+                                   Text="暂无传输数据"
+                                   Style="{ThemeResource CaptionTextBlockStyle}"
+                                   TextWrapping="Wrap"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                   AutomationProperties.AutomationId="TransportStats" />
                     </StackPanel>
-                </Border>
+                </Expander>
             </Grid>
-
-            <Border Grid.Row="1" Padding="20" CornerRadius="12"
-                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                    BorderThickness="1">
-                <StackPanel Spacing="9">
-                    <TextBlock Text="Peer device" FontSize="16" FontWeight="SemiBold" />
-                    <TextBlock Text="IP address of the Mac on your local network"
-                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                    <TextBox x:Name="PeerIpTextBox"
-                             PlaceholderText="192.168.101.162"
-                             Header="IP address"
-                             AutomationProperties.AutomationId="PeerIpAddress"
-                             TextChanged="PeerIpTextBox_TextChanged" />
-                </StackPanel>
-            </Border>
-
-            <StackPanel Grid.Row="2" Spacing="10">
-                <TextBlock Text="Direction" FontSize="16" FontWeight="SemiBold" />
-                <Grid ColumnSpacing="12">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <ToggleButton x:Name="SendModeButton" Grid.Column="0"
-                                  IsChecked="True" Click="DirectionButton_Click"
-                                  HorizontalContentAlignment="Stretch"
-                                  AutomationProperties.AutomationId="SendToMac">
-                        <StackPanel Padding="8,7" Spacing="7">
-                            <FontIcon Glyph="&#xE72A;" FontSize="20"
-                                      HorizontalAlignment="Left" />
-                            <TextBlock Text="Windows → Mac" FontWeight="SemiBold" />
-                            <TextBlock Text="Capture this PC's default output"
-                                       TextWrapping="Wrap"
-                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        </StackPanel>
-                    </ToggleButton>
-                    <ToggleButton x:Name="ReceiveModeButton" Grid.Column="1"
-                                  Click="DirectionButton_Click"
-                                  HorizontalContentAlignment="Stretch"
-                                  AutomationProperties.AutomationId="ReceiveFromMac">
-                        <StackPanel Padding="8,7" Spacing="7">
-                            <FontIcon Glyph="&#xE896;" FontSize="20"
-                                      HorizontalAlignment="Left" />
-                            <TextBlock Text="Mac → Windows" FontWeight="SemiBold" />
-                            <TextBlock Text="Play through this PC's default output"
-                                       TextWrapping="Wrap"
-                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        </StackPanel>
-                    </ToggleButton>
-                </Grid>
-            </StackPanel>
-
-            <Button x:Name="TransportButton" Grid.Row="3"
-                    Height="46" HorizontalAlignment="Stretch"
-                    HorizontalContentAlignment="Center"
-                    Style="{ThemeResource AccentButtonStyle}"
-                    Content="Start transport"
-                    Click="TransportButton_Click"
-                    AutomationProperties.AutomationId="TransportToggle" />
-
-            <InfoBar x:Name="TransportInfoBar" Grid.Row="4"
-                     IsOpen="True" IsClosable="False"
-                     Severity="Informational"
-                     Title="Ready"
-                     Message="Choose a direction, then start transport." />
-
-            <StackPanel Grid.Row="5" Spacing="10">
-                <TextBlock Text="Live transport" FontSize="16" FontWeight="SemiBold" />
-                <Grid ColumnSpacing="10">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <Border Grid.Column="0" Padding="14" CornerRadius="10"
-                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
-                        <StackPanel Spacing="4">
-                            <TextBlock Text="PACKETS" FontSize="11"
-                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                            <TextBlock x:Name="PacketsValue" Text="0" FontSize="19" FontWeight="SemiBold" />
-                        </StackPanel>
-                    </Border>
-                    <Border Grid.Column="1" Padding="14" CornerRadius="10"
-                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
-                        <StackPanel Spacing="4">
-                            <TextBlock Text="SIGNAL · dBFS" FontSize="11"
-                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                            <TextBlock x:Name="SignalValue" Text="—" FontSize="19" FontWeight="SemiBold" />
-                        </StackPanel>
-                    </Border>
-                    <Border Grid.Column="2" Padding="14" CornerRadius="10"
-                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
-                        <StackPanel Spacing="4">
-                            <TextBlock x:Name="RateLabel" Text="CAPTURE · FRAMES/S" FontSize="11"
-                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                            <TextBlock x:Name="RateValue" Text="—" FontSize="19" FontWeight="SemiBold" />
-                        </StackPanel>
-                    </Border>
-                    <Border Grid.Column="3" Padding="14" CornerRadius="10"
-                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
-                        <StackPanel Spacing="4">
-                            <TextBlock Text="QUALITY" FontSize="11"
-                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                            <TextBlock x:Name="QualityValue" Text="—" FontSize="15"
-                                       FontWeight="SemiBold" TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Border>
-                </Grid>
-                <TextBlock x:Name="RawStatsText" Text="No transport data yet"
-                           FontSize="12" TextWrapping="Wrap"
-                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                           AutomationProperties.AutomationId="TransportStats" />
-            </StackPanel>
-        </Grid>
-    </ScrollViewer>
+        </ScrollViewer>
+    </Grid>
 </Window>

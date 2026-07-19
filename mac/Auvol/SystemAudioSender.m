@@ -322,7 +322,7 @@ AuvolSystemAudioSender *auvol_system_audio_sender_start(
     tapDescription.name = @"Auvol system-audio sender";
     tapDescription.UUID = [NSUUID UUID];
     tapDescription.privateTap = YES;
-    tapDescription.muteBehavior = CATapUnmuted;
+    tapDescription.muteBehavior = CATapMuted;
     if (AudioHardwareCreateProcessTap(tapDescription, &sender->tapID) != noErr) {
         SetError(errorText, errorTextCapacity,
                  "System audio capture permission was denied");

@@ -37,6 +37,97 @@ namespace
         const auto end = value.find(' ');
         return value.substr(0, end);
     }
+
+    void ReplaceAll(std::string& value, std::string_view from,
+                    std::string_view to)
+    {
+        size_t position = 0;
+        while ((position = value.find(from, position)) != std::string::npos) {
+            value.replace(position, from.size(), to);
+            position += to.size();
+        }
+    }
+
+    std::string LocalizedStatus(std::string value)
+    {
+        struct Translation {
+            std::string_view english;
+            std::string_view chinese;
+        };
+        static constexpr Translation translations[] = {
+            { "Idle", "音频传输已暂停。" },
+            { "Direction control could not initialize Winsock", "无法初始化传输方向控制网络。" },
+            { "Direction control socket could not be opened", "无法打开传输方向控制套接字。" },
+            { "Direction control UDP port 7778 is unavailable", "传输方向控制端口 UDP 7778 不可用。" },
+            { "Switching direction from peer...", "正在根据对端请求切换传输方向…" },
+            { "Cannot open the Windows output device", "无法打开 Windows 输出设备。" },
+            { "Cannot identify the Windows output device", "无法识别 Windows 输出设备。" },
+            { "Cannot monitor the Windows output device", "无法监视 Windows 输出设备。" },
+            { "Cannot observe Windows output changes", "无法监听 Windows 输出设备变化。" },
+            { "Windows output does not accept 32-bit stereo PCM at the Mac sample rate", "Windows 输出设备不支持 Mac 采样率下的 32 位立体声 PCM。" },
+            { "Cannot create low-latency output renderer", "无法创建低延迟音频输出。" },
+            { "Cannot start Windows audio output", "无法启动 Windows 音频输出。" },
+            { "Windows output changed; reconnecting automatically", "Windows 输出设备已变化，正在自动重新连接…" },
+            { "Windows default output changed; reconnecting automatically", "Windows 默认输出设备已变化，正在自动重新连接…" },
+            { "Windows output was invalidated; reconnecting automatically", "Windows 输出设备已失效，正在自动重新连接…" },
+            { "Windows output buffer failed; reconnecting automatically", "Windows 输出缓冲区发生错误，正在自动重新连接…" },
+            { "Windows output commit failed; reconnecting automatically", "Windows 输出提交失败，正在自动重新连接…" },
+            { "COM initialization failed for output playback", "音频播放的 COM 初始化失败。" },
+            { "WSAStartup failed", "Windows 网络初始化失败。" },
+            { "Invalid destination or UDP socket failure", "目标地址无效或 UDP 套接字创建失败。" },
+            { "COM initialization failed", "COM 初始化失败。" },
+            { "Audio device enumeration failed", "无法枚举音频设备。" },
+            { "No default output device", "未找到默认音频输出设备。" },
+            { "Cannot identify the default output; retrying", "无法识别默认输出设备，正在重试…" },
+            { "Cannot monitor the default output; retrying", "无法监视默认输出设备，正在重试…" },
+            { "Cannot observe output changes; retrying", "无法监听输出设备变化，正在重试…" },
+            { "Audio endpoint activation failed", "音频端点激活失败。" },
+            { "Cannot read the output mix format", "无法读取输出设备的混音格式。" },
+            { "Default output must be stereo float32 (use VB-Cable)", "默认输出设备必须使用 32 位浮点立体声格式（可使用 VB-Cable）。" },
+            { "Low-latency audio client is unavailable", "低延迟音频客户端不可用。" },
+            { "Cannot set low-latency audio properties", "无法设置低延迟音频属性。" },
+            { "Cannot query the minimum audio-engine period", "无法查询音频引擎的最小周期。" },
+            { "Cannot create the period-control event", "无法创建周期控制事件。" },
+            { "Cannot register the period-control event", "无法注册周期控制事件。" },
+            { "Cannot create the period-control renderer", "无法创建周期控制输出。" },
+            { "Cannot prime the period-control renderer", "无法预热周期控制输出。" },
+            { "Cannot create the audio event", "无法创建音频事件。" },
+            { "WASAPI event registration failed", "WASAPI 事件注册失败。" },
+            { "WASAPI capture service failed", "WASAPI 音频采集服务启动失败。" },
+            { "Period-control renderer failed to start", "周期控制输出启动失败。" },
+            { "WASAPI start failed", "WASAPI 启动失败。" },
+            { "Audio event wait failed; retrying automatically", "等待音频事件失败，正在自动重试…" },
+            { "Windows output changed; rebuilding capture automatically", "Windows 输出设备已变化，正在自动重建采集…" },
+            { "Audio engine was invalidated; retrying automatically", "音频引擎已失效，正在自动重试…" },
+            { "Audio engine buffer failed; retrying automatically", "音频引擎缓冲区发生错误，正在自动重试…" },
+            { "Capture device was invalidated; retrying automatically", "音频采集设备已失效，正在自动重试…" },
+            { "Capture buffer read failed; retrying automatically", "读取采集缓冲区失败，正在自动重试…" },
+            { "Capture release failed; retrying automatically", "释放采集缓冲区失败，正在自动重试…" },
+            { "Default output changed; rebuilding capture automatically", "默认输出设备已变化，正在自动重建采集…" },
+            { "Audio engine stopped responding; retrying automatically", "音频引擎停止响应，正在自动重试…" },
+            { "UDP port 7777 is unavailable", "UDP 端口 7777 不可用。" },
+            { "Listening for Mac audio on UDP 7777", "正在通过 UDP 7777 等待 Mac 音频。" },
+            { "Recovering automatically...", "正在自动恢复音频传输…" },
+            { "Switching direction automatically...", "正在自动切换传输方向…" },
+        };
+        for (auto const& translation : translations) {
+            if (value == translation.english) {
+                return std::string(translation.chinese);
+            }
+        }
+        if (value.rfind("Minimum engine period rejected ", 0) == 0) {
+            return "系统拒绝最小音频引擎周期 " + value.substr(31) + "。";
+        }
+        if (value.rfind("WASAPI initialize failed ", 0) == 0) {
+            return "WASAPI 初始化失败 " + value.substr(25) + "。";
+        }
+        ReplaceAll(value, " ms engine period (loopback buffer ",
+                   " ms 引擎周期（回环缓冲区 ");
+        ReplaceAll(value, ") -> ", "）→ ");
+        ReplaceAll(value, " ms output period; receiving Mac audio",
+                   " ms 输出周期；正在接收 Mac 音频");
+        return value;
+    }
 }
 
 namespace winrt::Auvol::implementation
@@ -44,6 +135,8 @@ namespace winrt::Auvol::implementation
     MainWindow::MainWindow()
     {
         InitializeComponent();
+        ExtendsContentIntoTitleBar(true);
+        SetTitleBar(AppTitleBar());
         ConfigureWindow();
         InstallCoreCallbacks();
         Closed({ this, &MainWindow::OnClosed });
@@ -143,17 +236,17 @@ namespace winrt::Auvol::implementation
         }
         if (!PeerAddressIsValid()) {
             TransportInfoBar().Severity(InfoBarSeverity::Warning);
-            TransportInfoBar().Title(L"Invalid IP address");
-            TransportInfoBar().Message(L"Enter a valid IPv4 address for the peer Mac.");
+            TransportInfoBar().Title(L"IP 地址无效");
+            TransportInfoBar().Message(L"请输入 Mac 的有效 IPv4 地址。");
             return;
         }
         TransportInfoBar().Severity(InfoBarSeverity::Informational);
-        TransportInfoBar().Title(L"Starting");
-        TransportInfoBar().Message(L"Opening the audio engine and network transport…");
+        TransportInfoBar().Title(L"正在启动");
+        TransportInfoBar().Message(L"正在打开音频引擎和网络传输…");
         if (!auvol::Start(PeerAddress(), m_mode)) {
             TransportInfoBar().Severity(InfoBarSeverity::Error);
-            TransportInfoBar().Title(L"Could not start");
-            TransportInfoBar().Message(L"The transport controller could not be started.");
+            TransportInfoBar().Title(L"启动失败");
+            TransportInfoBar().Message(L"无法启动音频传输控制器。");
         }
     }
 
@@ -163,7 +256,7 @@ namespace winrt::Auvol::implementation
         m_mode = sender == ReceiveModeButton() ? 1 : 0;
         SendModeButton().IsChecked(m_mode == 0);
         ReceiveModeButton().IsChecked(m_mode == 1);
-        RateLabel().Text(m_mode == 0 ? L"CAPTURE · FRAMES/S" : L"RENDER · FRAMES/S");
+        RateLabel().Text(m_mode == 0 ? L"采集速率（帧/秒）" : L"播放速率（帧/秒）");
         ResetStats();
         auvol::SwitchMode(m_mode);
         auvol::SaveSettings(PeerAddress(), m_mode, m_running);
@@ -184,6 +277,7 @@ namespace winrt::Auvol::implementation
     {
         std::string clean = text;
         if (clean.rfind("Status: ", 0) == 0) clean.erase(0, 8);
+        const bool idle = clean == "Idle";
         const bool error = clean.find("Cannot") != std::string::npos ||
                            clean.find("failed") != std::string::npos ||
                            clean.find("unavailable") != std::string::npos;
@@ -191,18 +285,18 @@ namespace winrt::Auvol::implementation
                                 clean.find("Recover") != std::string::npos ||
                                 clean.find("reconnect") != std::string::npos ||
                                 clean.find("Switching") != std::string::npos;
-        TransportInfoBar().Severity(error ? InfoBarSeverity::Error :
+        TransportInfoBar().Severity(idle ? InfoBarSeverity::Informational :
+            error ? InfoBarSeverity::Error :
             recovering ? InfoBarSeverity::Warning : InfoBarSeverity::Success);
-        TransportInfoBar().Title(error ? L"Transport error" :
-            recovering ? L"Recovering" : L"Connected");
-        TransportInfoBar().Message(winrt::to_hstring(clean));
-        ConnectionStateText().Text(recovering ? L"Recovering" :
-            error ? L"Attention" : m_running ? L"Running" : L"Idle");
+        TransportInfoBar().Title(idle ? L"已暂停" : error ? L"传输错误" :
+            recovering ? L"正在恢复" : L"已连接");
+        TransportInfoBar().Message(winrt::to_hstring(LocalizedStatus(clean)));
+        ConnectionStateText().Text(idle ? L"空闲" : recovering ? L"正在恢复" :
+            error ? L"需要处理" : m_running ? L"运行中" : L"空闲");
     }
 
     void MainWindow::UpdateStats(std::string const& text)
     {
-        RawStatsText().Text(winrt::to_hstring(text));
         const auto packets = Trim(Metric(text, "Packets:"));
         const auto signal = Trim(Metric(text, "Signal:"));
         const auto capture = Trim(Metric(text, "Capture:"));
@@ -213,13 +307,24 @@ namespace winrt::Auvol::implementation
         PacketsValue().Text(winrt::to_hstring(packets.empty() ? "0" : packets));
         SignalValue().Text(winrt::to_hstring(signal.empty() ? "—" : FirstToken(signal)));
         const bool receiving = !render.empty();
-        RateLabel().Text(receiving ? L"RENDER · FRAMES/S" : L"CAPTURE · FRAMES/S");
+        RateLabel().Text(receiving ? L"播放速率（帧/秒）" : L"采集速率（帧/秒）");
         RateValue().Text(winrt::to_hstring(FirstToken(receiving ? render : capture)));
         const std::string quality = receiving
-            ? "Lost " + (lost.empty() ? std::string("0") : lost) +
-              " · " + (queue.empty() ? std::string("—") : queue)
-            : "Errors " + (errors.empty() ? std::string("0") : errors);
+            ? "丢包：" + (lost.empty() ? std::string("0") : lost) +
+              " · 队列：" + (queue.empty() ? std::string("—") : queue)
+            : "错误：" + (errors.empty() ? std::string("0") : errors);
         QualityValue().Text(winrt::to_hstring(quality));
+        const std::string rawStats = receiving
+            ? "数据包：" + (packets.empty() ? std::string("0") : packets) +
+              "　信号：" + (signal.empty() ? std::string("—") : signal) +
+              "　播放速率：" + (render.empty() ? std::string("—") : FirstToken(render) + " 帧/秒") +
+              "　丢包：" + (lost.empty() ? std::string("0") : lost) +
+              "　队列：" + (queue.empty() ? std::string("—") : queue)
+            : "数据包：" + (packets.empty() ? std::string("0") : packets) +
+              "　信号：" + (signal.empty() ? std::string("—") : signal) +
+              "　采集速率：" + (capture.empty() ? std::string("—") : FirstToken(capture) + " 帧/秒") +
+              "　错误：" + (errors.empty() ? std::string("0") : errors);
+        RawStatsText().Text(winrt::to_hstring(rawStats));
     }
 
     void MainWindow::UpdateRunning(bool running)
@@ -227,9 +332,9 @@ namespace winrt::Auvol::implementation
         m_running = running;
         PeerIpTextBox().IsEnabled(!running);
         TransportButton().Content(winrt::box_value(
-            running ? L"Stop transport" : L"Start transport"));
+            running ? L"停止传输" : L"开始传输"));
         TransportButton().IsEnabled(running || PeerAddressIsValid());
-        ConnectionStateText().Text(running ? L"Running" : L"Idle");
+        ConnectionStateText().Text(running ? L"运行中" : L"空闲");
         StateDot().Fill(Application::Current().Resources().Lookup(
             winrt::box_value(running ? L"SystemFillColorSuccessBrush" :
                                       L"TextFillColorTertiaryBrush")).as<Brush>());
@@ -241,7 +346,7 @@ namespace winrt::Auvol::implementation
         m_mode = mode == 1 ? 1 : 0;
         SendModeButton().IsChecked(m_mode == 0);
         ReceiveModeButton().IsChecked(m_mode == 1);
-        RateLabel().Text(m_mode == 0 ? L"CAPTURE · FRAMES/S" : L"RENDER · FRAMES/S");
+        RateLabel().Text(m_mode == 0 ? L"采集速率（帧/秒）" : L"播放速率（帧/秒）");
         ResetStats();
         auvol::SaveSettings(PeerAddress(), m_mode, m_running);
     }
@@ -252,7 +357,7 @@ namespace winrt::Auvol::implementation
         SignalValue().Text(L"—");
         RateValue().Text(L"—");
         QualityValue().Text(L"—");
-        RawStatsText().Text(L"No transport data yet");
+        RawStatsText().Text(L"暂无传输数据");
     }
 
     bool MainWindow::PeerAddressIsValid()
