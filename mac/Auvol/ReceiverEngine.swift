@@ -20,6 +20,9 @@ final class ReceiverEngine: ObservableObject {
     private static let targetBufferKey = "alv2TargetBufferMs"
     private static let peerIPKey = "alv2PeerIP"
     private static let roleKey = "alv2MacRole"
+    private static let autoFollowKey = "alv2AutoFollowOutput"
+    private static let followedOutputUIDKey = "alv2FollowedOutputUID"
+    private static let followedOutputNameKey = "alv2FollowedOutputName"
     private static let defaultTargetBufferMs = 12
     private static let signalThreshold: Float = 0.000_01
 
@@ -50,12 +53,17 @@ final class ReceiverEngine: ObservableObject {
     @Published var peerIP = "192.168.101.170"
     @Published var errorMessage = ""
     @Published var port: UInt16 = 7777
+    @Published private(set) var autoFollowEnabled = false
+    @Published private(set) var followedOutputName = ""
+    @Published private(set) var currentSystemOutputName = ""
+    @Published private(set) var currentSystemOutputIsBluetooth = false
 
     private let logger = Logger(subsystem: "com.eli.Auvol", category: "stream")
     private let metricsLock = NSLock()
     private let lifecycleLock = NSLock()
     private let player = AudioPlayer()
     private let sender = AudioSender()
+    private let outputRouteMonitor = AudioOutputRouteMonitor()
     private var directionControl: DirectionControlChannel?
     private var network: NetworkReceiver?
     private var statsTimer: Timer?
@@ -80,6 +88,8 @@ final class ReceiverEngine: ObservableObject {
     private var ingressPeak: Float = 0
     private var lastAudioTime: Date?
     private var lastSignalTime: Date?
+    private var currentOutputRoute: AudioOutputRoute?
+    private var followedOutputUID = ""
 
     private var previousPacketCount: UInt64 = 0
     private var previousUnderrunFrames: UInt64 = 0
@@ -106,6 +116,13 @@ final class ReceiverEngine: ObservableObject {
         let saved = UserDefaults.standard.object(forKey: Self.targetBufferKey) as? Int
         targetBufferMs = min(80, max(8, saved ?? Self.defaultTargetBufferMs))
         peerIP = initialPeerIP ?? UserDefaults.standard.string(forKey: Self.peerIPKey) ?? peerIP
+        autoFollowEnabled = UserDefaults.standard.bool(forKey: Self.autoFollowKey)
+        followedOutputUID = UserDefaults.standard.string(
+            forKey: Self.followedOutputUIDKey
+        ) ?? ""
+        followedOutputName = UserDefaults.standard.string(
+            forKey: Self.followedOutputNameKey
+        ) ?? ""
         player.setTargetBufferMs(targetBufferMs)
 
         let control = DirectionControlChannel(
@@ -119,6 +136,10 @@ final class ReceiverEngine: ObservableObject {
             logger.warning("direction control unavailable: \(error, privacy: .public)")
         }
         directionControl = control
+        outputRouteMonitor.onStableRoute = { [weak self] route in
+            self?.handleStableOutputRoute(route)
+        }
+        outputRouteMonitor.start()
 
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
@@ -135,6 +156,40 @@ final class ReceiverEngine: ObservableObject {
         }
         applyRolePreservingPause(newRole)
         directionControl?.publish(newRole == .receive ? .windowsToMac : .macToWindows)
+    }
+
+    func setAutoFollowEnabled(_ enabled: Bool) {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.setAutoFollowEnabled(enabled)
+            }
+            return
+        }
+        autoFollowEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: Self.autoFollowKey)
+        guard enabled else { return }
+        if followedOutputUID.isEmpty,
+           let route = currentOutputRoute,
+           route.isBluetooth {
+            bindFollowedOutput(route)
+        }
+        claimReceiverIfFollowedOutputIsCurrent()
+    }
+
+    func followCurrentBluetoothOutput() {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.followCurrentBluetoothOutput()
+            }
+            return
+        }
+        guard let route = currentOutputRoute, route.isBluetooth else { return }
+        bindFollowedOutput(route)
+        if !autoFollowEnabled {
+            autoFollowEnabled = true
+            UserDefaults.standard.set(true, forKey: Self.autoFollowKey)
+        }
+        claimReceiverIfFollowedOutputIsCurrent()
     }
 
     func start() {
@@ -222,6 +277,45 @@ final class ReceiverEngine: ObservableObject {
         let newRole: TransportRole = direction == .windowsToMac ? .receive : .send
         guard newRole != role else { return }
         applyRolePreservingPause(newRole)
+    }
+
+    private func handleStableOutputRoute(_ route: AudioOutputRoute?) {
+        currentOutputRoute = route
+        currentSystemOutputName = route?.name ?? "No output device"
+        currentSystemOutputIsBluetooth = route?.isBluetooth ?? false
+        guard autoFollowEnabled, let route else { return }
+
+        if followedOutputUID.isEmpty && route.isBluetooth {
+            bindFollowedOutput(route)
+        } else if route.isBluetooth,
+                  route.uid != followedOutputUID,
+                  !followedOutputName.isEmpty,
+                  route.name == followedOutputName {
+            // Core Audio may expose a new UID after a Bluetooth profile change.
+            bindFollowedOutput(route)
+        }
+        claimReceiverIfFollowedOutputIsCurrent()
+    }
+
+    private func bindFollowedOutput(_ route: AudioOutputRoute) {
+        followedOutputUID = route.uid
+        followedOutputName = route.name
+        UserDefaults.standard.set(route.uid, forKey: Self.followedOutputUIDKey)
+        UserDefaults.standard.set(route.name, forKey: Self.followedOutputNameKey)
+    }
+
+    private func claimReceiverIfFollowedOutputIsCurrent() {
+        guard autoFollowEnabled,
+              let route = currentOutputRoute,
+              route.isBluetooth,
+              !followedOutputUID.isEmpty,
+              route.uid == followedOutputUID else { return }
+        if role != .receive {
+            applyRolePreservingPause(.receive)
+        }
+        // Publish even when this side already has the right role so a peer that
+        // missed an earlier event converges after launch or wake.
+        directionControl?.publish(.windowsToMac)
     }
 
     private func applyRolePreservingPause(_ newRole: TransportRole) {
@@ -692,6 +786,7 @@ final class ReceiverEngine: ObservableObject {
         peerChangeWorkItem?.cancel()
         statsTimer?.invalidate()
         directionControl?.stop()
+        outputRouteMonitor.stop()
         network?.stop()
         player.stop()
         sender.stop()

@@ -45,6 +45,7 @@ final class DirectionControlChannel {
     private var winner: DirectionState
     private var pending: DirectionState?
     private var retryToken: UInt64 = 0
+    private var heartbeatToken: UInt64 = 0
 
     var onDirection: ((SynchronizedDirection) -> Void)?
 
@@ -96,12 +97,18 @@ final class DirectionControlChannel {
         source.setEventHandler { [weak self] in self?.drainIncoming() }
         readSource = source
         source.resume()
+        queue.async { [weak self] in
+            guard let self else { return }
+            heartbeatToken &+= 1
+            scheduleHeartbeat(token: heartbeatToken)
+        }
         return nil
     }
 
     func stop() {
         queue.sync {
             retryToken &+= 1
+            heartbeatToken &+= 1
             pending = nil
             readSource?.cancel()
             readSource = nil
@@ -145,6 +152,18 @@ final class DirectionControlChannel {
             guard let self, retryToken == token, pending == state else { return }
             send(state, type: .setDirection, to: peerAddress())
             scheduleRetry(state, token: token, delayIndex: delayIndex + 1)
+        }
+    }
+
+    private func scheduleHeartbeat(token: UInt64) {
+        queue.asyncAfter(deadline: .now() + 5) { [weak self] in
+            guard let self,
+                  heartbeatToken == token,
+                  socketFD >= 0 else { return }
+            // An acknowledgement does not trigger a reply, so both peers can
+            // advertise their winner without creating a packet echo.
+            send(winner, type: .acknowledgement, to: peerAddress())
+            scheduleHeartbeat(token: token)
         }
     }
 

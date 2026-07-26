@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		3BD0BD0AD7D750EBD7E93BF4 /* ReceiverEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6833A9BAD43D712DCD5AFF0B /* ReceiverEngine.swift */; };
+		45A1FF540998FC5989CCD839 /* AudioOutputRouteMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FF93CF7280B83BEB6678843 /* AudioOutputRouteMonitor.swift */; };
 		4CF88C6FC8E2731B77A9D69F /* SystemAudioSender.m in Sources */ = {isa = PBXBuildFile; fileRef = 2DD94B8398183BAC3DB15A9F /* SystemAudioSender.m */; };
 		753AF5C00AC47DCA52011428 /* AudioPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 693C245EAE0EB2F9B5B5A327 /* AudioPlayer.swift */; };
 		794E8F086EEE82C1C4918C2A /* AudioSender.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CA42E6CADBCAE40155EA99E /* AudioSender.swift */; };
@@ -23,6 +24,7 @@
 /* Begin PBXFileReference section */
 		06C0F94AF7B3B427FFDE9EE2 /* Auvol.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Auvol.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		0B252C4A09639EDD9CD76163 /* NetworkReceiver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkReceiver.swift; sourceTree = "<group>"; };
+		1FF93CF7280B83BEB6678843 /* AudioOutputRouteMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioOutputRouteMonitor.swift; sourceTree = "<group>"; };
 		2DD94B8398183BAC3DB15A9F /* SystemAudioSender.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SystemAudioSender.m; sourceTree = "<group>"; };
 		49C17C025BD4D7601298E8AD /* Protocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Protocol.swift; sourceTree = "<group>"; };
 		4BF7B13D14D2F171F15418B7 /* Auvol.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = Auvol.icon; sourceTree = "<group>"; };
@@ -59,6 +61,7 @@
 		F31C1E99723C080DC97CFD30 /* Auvol */ = {
 			isa = PBXGroup;
 			children = (
+				1FF93CF7280B83BEB6678843 /* AudioOutputRouteMonitor.swift */,
 				693C245EAE0EB2F9B5B5A327 /* AudioPlayer.swift */,
 				7766717944A0BFD3082C1E30 /* AudioRing.c */,
 				909DF5FA8150044F93B5A21D /* AudioRing.h */,
@@ -147,6 +150,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				45A1FF540998FC5989CCD839 /* AudioOutputRouteMonitor.swift in Sources */,
 				753AF5C00AC47DCA52011428 /* AudioPlayer.swift in Sources */,
 				B20FD5FC7509D32F7012AB49 /* AudioRing.c in Sources */,
 				794E8F086EEE82C1C4918C2A /* AudioSender.swift in Sources */,

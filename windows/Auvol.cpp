@@ -7,6 +7,8 @@
 #include <mmdeviceapi.h>
 #include <audioclient.h>
 #include <avrt.h>
+#include <functiondiscoverykeys_devpkey.h>
+#include <propsys.h>
 #include <shellapi.h>
 
 #include "resource.h"
@@ -53,6 +55,17 @@ static const GUID SUBTYPE_FLOAT = {
     {0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71}
 };
 
+// mmdeviceapi.h declares this key as extern unless INITGUID is enabled for the
+// whole translation unit. Keep the SDK-defined value local to avoid a fragile
+// linker dependency on a property-key definition library.
+static constexpr PROPERTYKEY AUVOL_PKEY_AUDIO_ENDPOINT_FORM_FACTOR = {
+    {
+        0x1da5d803, 0xd492, 0x4edd,
+        {0x8c, 0x23, 0xe0, 0xc0, 0xff, 0xee, 0x7f, 0x0e}
+    },
+    0
+};
+
 static HWND g_mainWindow = nullptr;
 static HWND g_ipEdit = nullptr;
 static HWND g_modeCombo = nullptr;
@@ -63,6 +76,9 @@ static HWND g_statsLabel = nullptr;
 static std::string g_savedIP = "192.168.101.162";
 static int g_savedMode = 0;
 static bool g_savedRunning = false;
+static bool g_savedAutoFollow = false;
+static std::string g_followedOutputID;
+static std::string g_followedOutputName;
 static std::atomic<bool> g_running{false};
 static std::atomic<bool> g_connected{false};
 static std::atomic<int> g_desiredMode{0};
@@ -76,6 +92,17 @@ static auvol::TextCallback g_statusCallback;
 static auvol::TextCallback g_statsCallback;
 static auvol::RunningCallback g_runningCallback;
 static auvol::ModeCallback g_modeCallback;
+static auvol::AutoFollowCallback g_autoFollowCallback;
+static std::mutex g_autoFollowMutex;
+static std::string g_currentOutputID;
+static std::string g_currentOutputName;
+static bool g_currentOutputAvailable = false;
+static std::atomic<UINT64> g_autoFollowGeneration{0};
+static std::atomic<bool> g_autoMonitorRunning{false};
+static HANDLE g_autoMonitorEvent = nullptr;
+static std::thread g_autoMonitorThread;
+
+static void PersistAutoFollowSettings();
 
 static bool SessionCurrent(UINT64 generation, int mode) {
     return g_running.load(std::memory_order_acquire) &&
@@ -173,6 +200,102 @@ static bool DefaultEndpointMatches(IMMDeviceEnumerator* enumerator,
     return matched;
 }
 
+struct OutputRoute {
+    std::string identity;
+    std::string name;
+    bool likelyHeadphones = false;
+
+    bool operator==(const OutputRoute& other) const {
+        return identity == other.identity &&
+               name == other.name &&
+               likelyHeadphones == other.likelyHeadphones;
+    }
+};
+
+static std::string WideToUTF8(const wchar_t* value) {
+    if (!value || !*value) return {};
+    const int size = WideCharToMultiByte(CP_UTF8, 0, value, -1, nullptr, 0,
+                                         nullptr, nullptr);
+    if (size <= 1) return {};
+    std::string result(static_cast<size_t>(size), '\0');
+    WideCharToMultiByte(CP_UTF8, 0, value, -1, result.data(), size,
+                        nullptr, nullptr);
+    result.pop_back();
+    return result;
+}
+
+static std::wstring UTF8ToWide(const std::string& value) {
+    if (value.empty()) return {};
+    const int size = MultiByteToWideChar(CP_UTF8, 0, value.c_str(), -1,
+                                         nullptr, 0);
+    if (size <= 1) return {};
+    std::wstring result(static_cast<size_t>(size), L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, value.c_str(), -1, result.data(), size);
+    result.pop_back();
+    return result;
+}
+
+static std::string GuidIdentity(const GUID& value) {
+    wchar_t text[40] = {};
+    if (StringFromGUID2(value, text, static_cast<int>(std::size(text))) <= 1) {
+        return {};
+    }
+    return "container:" + WideToUTF8(text);
+}
+
+static OutputRoute ReadDefaultOutputRoute(IMMDeviceEnumerator* enumerator) {
+    OutputRoute route;
+    if (!enumerator) return route;
+
+    IMMDevice* device = nullptr;
+    if (FAILED(enumerator->GetDefaultAudioEndpoint(eRender, eConsole, &device)) ||
+        !device) {
+        return route;
+    }
+
+    std::wstring endpointID;
+    DeviceID(device, &endpointID);
+    IPropertyStore* properties = nullptr;
+    if (SUCCEEDED(device->OpenPropertyStore(STGM_READ, &properties)) &&
+        properties) {
+        PROPVARIANT value;
+        PropVariantInit(&value);
+        if (SUCCEEDED(properties->GetValue(PKEY_Device_FriendlyName, &value)) &&
+            value.vt == VT_LPWSTR && value.pwszVal) {
+            route.name = WideToUTF8(value.pwszVal);
+        }
+        PropVariantClear(&value);
+
+        PropVariantInit(&value);
+        if (SUCCEEDED(properties->GetValue(PKEY_Device_ContainerId, &value)) &&
+            value.vt == VT_CLSID && value.puuid) {
+            route.identity = GuidIdentity(*value.puuid);
+        }
+        PropVariantClear(&value);
+
+        PropVariantInit(&value);
+        if (SUCCEEDED(properties->GetValue(
+                                               AUVOL_PKEY_AUDIO_ENDPOINT_FORM_FACTOR,
+                                           &value)) &&
+            value.vt == VT_UI4) {
+            const auto form = static_cast<EndpointFormFactor>(value.ulVal);
+            route.likelyHeadphones = form == Headphones || form == Headset;
+        }
+        PropVariantClear(&value);
+        properties->Release();
+    }
+
+    if (route.identity.empty() && !endpointID.empty()) {
+        route.identity = "endpoint:" + WideToUTF8(endpointID.c_str());
+    }
+    if (route.name.empty()) {
+        route.name = endpointID.empty()
+            ? "Unknown output" : WideToUTF8(endpointID.c_str());
+    }
+    device->Release();
+    return route;
+}
+
 static void Put16(void* destination, UINT16 value) {
     memcpy(destination, &value, sizeof(value));
 }
@@ -240,6 +363,30 @@ static void NotifyMode(int mode) {
     } else if (g_mainWindow) {
         PostMessageW(g_mainWindow, WM_APP + 5,
                      static_cast<WPARAM>(mode), 0);
+    }
+}
+
+static void NotifyAutoFollow() {
+    bool enabled = false;
+    bool currentAvailable = false;
+    std::string followedName;
+    std::string currentName;
+    {
+        std::lock_guard<std::mutex> lock(g_autoFollowMutex);
+        enabled = g_savedAutoFollow;
+        followedName = g_followedOutputName;
+        currentName = g_currentOutputName;
+        currentAvailable = g_currentOutputAvailable;
+    }
+
+    auvol::AutoFollowCallback callback;
+    {
+        std::lock_guard<std::mutex> lock(g_callbackMutex);
+        callback = g_autoFollowCallback;
+    }
+    if (callback) {
+        callback(enabled, std::move(followedName), std::move(currentName),
+                 currentAvailable);
     }
 }
 
@@ -487,6 +634,21 @@ static void MaybeSendPendingDirection(SOCKET socketFD) {
     }
 }
 
+static void SendDirectionHeartbeat(SOCKET socketFD) {
+    DirectionState state;
+    std::string peerIP;
+    {
+        std::lock_guard<std::mutex> lock(g_directionMutex);
+        EnsureDirectionStateLoadedLocked();
+        state = g_directionWinner;
+        peerIP = g_directionPeerIP;
+    }
+    sockaddr_in destination = {};
+    if (DirectionAddress(peerIP, &destination)) {
+        SendDirectionState(socketFD, DIRECTION_ACK, state, destination);
+    }
+}
+
 static void ReceiveDirectionPacket(SOCKET socketFD, const UINT8* bytes,
                                    int length, const sockaddr_in& source) {
     if (!DirectionSourceMatchesPeer(source)) return;
@@ -563,9 +725,16 @@ static void DirectionControlThread() {
     u_long nonblocking = 1;
     ioctlsocket(socketFD, FIONBIO, &nonblocking);
     g_directionSocket.store(socketFD, std::memory_order_release);
+    auto nextHeartbeat = std::chrono::steady_clock::now() +
+        std::chrono::seconds(5);
 
     while (g_directionControlRunning.load(std::memory_order_acquire)) {
         MaybeSendPendingDirection(socketFD);
+        const auto now = std::chrono::steady_clock::now();
+        if (now >= nextHeartbeat) {
+            SendDirectionHeartbeat(socketFD);
+            nextHeartbeat = now + std::chrono::seconds(5);
+        }
         fd_set readable;
         FD_ZERO(&readable);
         FD_SET(socketFD, &readable);
@@ -1727,6 +1896,92 @@ static void SupervisorThread(std::string targetIP, UINT16 port) {
     if (g_mainWindow) PostMessageA(g_mainWindow, WM_APP + 3, 0, 0);
 }
 
+static void AutoDirectionMonitorThread() {
+    const HRESULT comStatus = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    IMMDeviceEnumerator* enumerator = nullptr;
+    if (SUCCEEDED(CoCreateInstance(
+            __uuidof(MMDeviceEnumerator),
+            nullptr,
+            CLSCTX_ALL,
+            __uuidof(IMMDeviceEnumerator),
+            reinterpret_cast<void**>(&enumerator)))) {
+        OutputRoute lastReported;
+        OutputRoute candidate;
+        auto candidateSince = std::chrono::steady_clock::now();
+        bool processedCandidate = false;
+        UINT64 observedGeneration =
+            g_autoFollowGeneration.load(std::memory_order_acquire);
+
+        while (g_autoMonitorRunning.load(std::memory_order_acquire)) {
+            const DWORD wait = WaitForSingleObject(g_autoMonitorEvent, 250);
+            if (!g_autoMonitorRunning.load(std::memory_order_acquire)) break;
+            if (wait == WAIT_FAILED) break;
+
+            const auto now = std::chrono::steady_clock::now();
+            const OutputRoute route = ReadDefaultOutputRoute(enumerator);
+            if (!(route == lastReported)) {
+                lastReported = route;
+                {
+                    std::lock_guard<std::mutex> lock(g_autoFollowMutex);
+                    g_currentOutputID = route.identity;
+                    g_currentOutputName = route.name;
+                    g_currentOutputAvailable = !route.identity.empty();
+                }
+                NotifyAutoFollow();
+            }
+
+            if (route.identity != candidate.identity) {
+                candidate = route;
+                candidateSince = now;
+                processedCandidate = false;
+            }
+
+            const UINT64 generation =
+                g_autoFollowGeneration.load(std::memory_order_acquire);
+            if (generation != observedGeneration) {
+                observedGeneration = generation;
+                candidateSince = now;
+                processedCandidate = false;
+            }
+
+            if (processedCandidate ||
+                now - candidateSince < std::chrono::seconds(1)) {
+                continue;
+            }
+            processedCandidate = true;
+
+            bool didBind = false;
+            bool shouldClaim = false;
+            {
+                std::lock_guard<std::mutex> lock(g_autoFollowMutex);
+                if (g_savedAutoFollow &&
+                    g_followedOutputID.empty() &&
+                    route.likelyHeadphones &&
+                    !route.identity.empty()) {
+                    g_followedOutputID = route.identity;
+                    g_followedOutputName = route.name;
+                    didBind = true;
+                }
+                shouldClaim = g_savedAutoFollow &&
+                    !g_followedOutputID.empty() &&
+                    route.identity == g_followedOutputID;
+            }
+            if (didBind) {
+                PersistAutoFollowSettings();
+                NotifyAutoFollow();
+            }
+            if (shouldClaim) {
+                PostStatus(
+                    "Selected headphones are on Windows; switching direction..."
+                );
+                auvol::SwitchMode(1);
+            }
+        }
+        enumerator->Release();
+    }
+    if (SUCCEEDED(comStatus)) CoUninitialize();
+}
+
 static void SetConnectedControls(bool connected) {
     EnableWindow(g_ipEdit, !connected);
     EnableWindow(g_modeCombo, TRUE);
@@ -1743,6 +1998,67 @@ static void JoinAudioThread() {
 static void WriteUserDword(HKEY key, const wchar_t* name, DWORD value) {
     RegSetValueExW(key, name, 0, REG_DWORD,
                    reinterpret_cast<const BYTE*>(&value), sizeof(value));
+}
+
+static void WriteUserString(HKEY key, const wchar_t* name,
+                            const std::string& value) {
+    const std::wstring wide = UTF8ToWide(value);
+    RegSetValueExW(
+        key,
+        name,
+        0,
+        REG_SZ,
+        reinterpret_cast<const BYTE*>(wide.c_str()),
+        static_cast<DWORD>((wide.size() + 1) * sizeof(wchar_t))
+    );
+}
+
+static std::string ReadUserString(HKEY key, const wchar_t* name) {
+    DWORD type = 0;
+    DWORD size = 0;
+    if (RegQueryValueExW(key, name, nullptr, &type, nullptr, &size) !=
+            ERROR_SUCCESS ||
+        type != REG_SZ ||
+        size < sizeof(wchar_t)) {
+        return {};
+    }
+    std::vector<wchar_t> value(
+        (static_cast<size_t>(size) + sizeof(wchar_t) - 1) / sizeof(wchar_t),
+        L'\0'
+    );
+    if (RegQueryValueExW(
+            key,
+            name,
+            nullptr,
+            &type,
+            reinterpret_cast<BYTE*>(value.data()),
+            &size
+        ) != ERROR_SUCCESS) {
+        return {};
+    }
+    value.back() = L'\0';
+    return WideToUTF8(value.data());
+}
+
+static void PersistAutoFollowSettings() {
+    bool enabled = false;
+    std::string followedID;
+    std::string followedName;
+    {
+        std::lock_guard<std::mutex> lock(g_autoFollowMutex);
+        enabled = g_savedAutoFollow;
+        followedID = g_followedOutputID;
+        followedName = g_followedOutputName;
+    }
+    HKEY key = nullptr;
+    if (RegCreateKeyExW(HKEY_CURRENT_USER, L"Software\\Auvol", 0, nullptr, 0,
+                        KEY_SET_VALUE, nullptr, &key, nullptr) != ERROR_SUCCESS) {
+        return;
+    }
+    WriteUserDword(key, L"AutoFollowEnabled", enabled ? 1 : 0);
+    WriteUserString(key, L"FollowedOutputID", followedID);
+    WriteUserString(key, L"FollowedOutputName", followedName);
+    RegCloseKey(key);
 }
 
 static void SaveUserSettings(bool running) {
@@ -1782,6 +2098,15 @@ static void LoadUserSettings() {
         type == REG_DWORD) {
         g_savedRunning = value != 0;
     }
+    value = 0;
+    size = sizeof(value);
+    if (RegQueryValueExW(key, L"AutoFollowEnabled", nullptr, &type,
+                         reinterpret_cast<BYTE*>(&value), &size) == ERROR_SUCCESS &&
+        type == REG_DWORD) {
+        g_savedAutoFollow = value != 0;
+    }
+    g_followedOutputID = ReadUserString(key, L"FollowedOutputID");
+    g_followedOutputName = ReadUserString(key, L"FollowedOutputName");
     RegCloseKey(key);
 }
 
@@ -1833,17 +2158,26 @@ namespace auvol {
 void SetCallbacks(TextCallback status,
                   TextCallback stats,
                   RunningCallback running,
-                  ModeCallback mode) {
+                  ModeCallback mode,
+                  AutoFollowCallback autoFollow) {
     std::lock_guard<std::mutex> lock(g_callbackMutex);
     g_statusCallback = std::move(status);
     g_statsCallback = std::move(stats);
     g_runningCallback = std::move(running);
     g_modeCallback = std::move(mode);
+    g_autoFollowCallback = std::move(autoFollow);
 }
 
 Settings LoadSettings() {
     LoadUserSettings();
-    return {g_savedIP, g_savedMode, g_savedRunning};
+    std::lock_guard<std::mutex> lock(g_autoFollowMutex);
+    return {
+        g_savedIP,
+        g_savedMode,
+        g_savedRunning,
+        g_savedAutoFollow,
+        g_followedOutputName
+    };
 }
 
 void SaveSettings(const std::string& peerIP, int mode, bool running) {
@@ -1890,6 +2224,48 @@ void StartDirectionControl(const std::string& peerIP) {
         EnsureDirectionStateLoadedLocked();
     }
     g_directionThread = std::thread(DirectionControlThread);
+}
+
+void StartAutoDirectionMonitor() {
+    if (g_autoMonitorRunning.exchange(true, std::memory_order_acq_rel)) {
+        NotifyAutoFollow();
+        return;
+    }
+    if (g_autoMonitorThread.joinable()) g_autoMonitorThread.join();
+    g_autoMonitorEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    if (!g_autoMonitorEvent) {
+        g_autoMonitorRunning.store(false, std::memory_order_release);
+        return;
+    }
+    g_autoMonitorThread = std::thread(AutoDirectionMonitorThread);
+}
+
+void SetAutoFollowEnabled(bool enabled) {
+    {
+        std::lock_guard<std::mutex> lock(g_autoFollowMutex);
+        g_savedAutoFollow = enabled;
+    }
+    PersistAutoFollowSettings();
+    g_autoFollowGeneration.fetch_add(1, std::memory_order_acq_rel);
+    if (g_autoMonitorEvent) SetEvent(g_autoMonitorEvent);
+    NotifyAutoFollow();
+}
+
+bool UseCurrentOutputForAutoFollow() {
+    {
+        std::lock_guard<std::mutex> lock(g_autoFollowMutex);
+        if (!g_currentOutputAvailable || g_currentOutputID.empty()) {
+            return false;
+        }
+        g_followedOutputID = g_currentOutputID;
+        g_followedOutputName = g_currentOutputName;
+        g_savedAutoFollow = true;
+    }
+    PersistAutoFollowSettings();
+    g_autoFollowGeneration.fetch_add(1, std::memory_order_acq_rel);
+    if (g_autoMonitorEvent) SetEvent(g_autoMonitorEvent);
+    NotifyAutoFollow();
+    return true;
 }
 
 bool Start(const std::string& peerIP, int mode) {
@@ -1946,6 +2322,13 @@ bool IsRunning() {
 
 void Shutdown() {
     Stop();
+    g_autoMonitorRunning.store(false, std::memory_order_release);
+    if (g_autoMonitorEvent) SetEvent(g_autoMonitorEvent);
+    if (g_autoMonitorThread.joinable()) g_autoMonitorThread.join();
+    if (g_autoMonitorEvent) {
+        CloseHandle(g_autoMonitorEvent);
+        g_autoMonitorEvent = nullptr;
+    }
     StopDirectionControl();
     {
         std::lock_guard<std::mutex> lock(g_callbackMutex);
@@ -1953,6 +2336,7 @@ void Shutdown() {
         g_statsCallback = {};
         g_runningCallback = {};
         g_modeCallback = {};
+        g_autoFollowCallback = {};
     }
     if (g_controlEvent) {
         CloseHandle(g_controlEvent);

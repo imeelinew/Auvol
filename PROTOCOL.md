@@ -86,6 +86,11 @@ applies it locally, sends `set direction`, and retries briefly until an
 acknowledgement arrives. The peer applies the complementary local role and
 returns an acknowledgement without broadcasting another change.
 
+Each application also advertises its persisted winning state every five seconds
+using an acknowledgement packet. Heartbeats do not elicit another response.
+They let a peer that starts late or wakes from sleep converge without changing
+the packet format or creating acknowledgement loops.
+
 States are ordered lexicographically by `(version, origin_id)`. Each receiver
 advances its Lamport clock when it sees a newer version. If both devices change
 direction at nearly the same time, this ordering selects one deterministic
@@ -94,3 +99,5 @@ devices converge. Duplicate packets are idempotent.
 
 Direction synchronization never changes the paused/running state. A paused app
 updates its selected direction but remains paused until the user resumes it.
+An enabled automatic-output policy may originate the same direction change when
+its selected headphones become the stable default system output.

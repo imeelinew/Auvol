@@ -66,6 +66,8 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="1" />
                             <RowDefinition Height="Auto" />
+                            <RowDefinition Height="1" />
+                            <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
 
                         <Grid Padding="16" ColumnSpacing="16">
@@ -100,6 +102,51 @@
                                 Background="{ThemeResource CardStrokeColorDefaultBrush}" />
 
                         <Grid Grid.Row="2" Padding="16" ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE702;"
+                                      FontSize="20"
+                                      VerticalAlignment="Center"
+                                      Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <StackPanel Grid.Column="1"
+                                        VerticalAlignment="Center"
+                                        Spacing="2">
+                                <TextBlock Text="自动跟随指定耳机"
+                                           Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                                <TextBlock x:Name="FollowedOutputText"
+                                           Text="尚未选择耳机；启用后会采用当前的耳机输出。"
+                                           Style="{ThemeResource CaptionTextBlockStyle}"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                           TextWrapping="Wrap" />
+                                <TextBlock x:Name="CurrentOutputText"
+                                           Text="正在检测 Windows 默认输出…"
+                                           Style="{ThemeResource CaptionTextBlockStyle}"
+                                           Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2"
+                                        Orientation="Horizontal"
+                                        VerticalAlignment="Center"
+                                        Spacing="12">
+                                <Button x:Name="UseCurrentOutputButton"
+                                        Content="使用当前输出"
+                                        Click="UseCurrentOutputButton_Click"
+                                        AutomationProperties.AutomationId="UseCurrentOutput" />
+                                <ToggleSwitch x:Name="AutoFollowToggle"
+                                              OffContent="关闭"
+                                              OnContent="开启"
+                                              Toggled="AutoFollowToggle_Toggled"
+                                              AutomationProperties.AutomationId="AutoFollowHeadphones" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Border Grid.Row="3"
+                                Background="{ThemeResource CardStrokeColorDefaultBrush}" />
+
+                        <Grid Grid.Row="4" Padding="16" ColumnSpacing="16">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />

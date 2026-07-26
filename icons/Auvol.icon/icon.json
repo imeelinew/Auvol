@@ -18,7 +18,6 @@
       "layers" : [
         {
           "glass" : true,
-          "hidden" : true,
           "image-name" : "waveform.svg",
           "name" : "waveform",
           "position" : {
@@ -37,29 +36,6 @@
       "translucency" : {
         "enabled" : true,
         "value" : 0.2
-      }
-    },
-    {
-      "layers" : [
-        {
-          "image-name" : "wave.3.forward.svg",
-          "name" : "wave.3.forward",
-          "position" : {
-            "scale" : 30,
-            "translation-in-points" : [
-              7.428843673551455e-08,
-              0
-            ]
-          }
-        }
-      ],
-      "shadow" : {
-        "kind" : "neutral",
-        "opacity" : 0.5
-      },
-      "translucency" : {
-        "enabled" : true,
-        "value" : 0.3
       }
     }
   ],

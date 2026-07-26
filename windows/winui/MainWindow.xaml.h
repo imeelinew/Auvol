@@ -14,11 +14,16 @@ namespace winrt::Auvol::implementation
                                    Microsoft::UI::Xaml::RoutedEventArgs const&);
         void PeerIpTextBox_TextChanged(IInspectable const&,
                                       Microsoft::UI::Xaml::Controls::TextChangedEventArgs const&);
+        void AutoFollowToggle_Toggled(IInspectable const&,
+                                      Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void UseCurrentOutputButton_Click(IInspectable const&,
+                                          Microsoft::UI::Xaml::RoutedEventArgs const&);
 
     private:
         HWND m_hwnd = nullptr;
         int m_mode = 0;
         bool m_running = false;
+        bool m_applyingAutoFollow = false;
 
         void ConfigureWindow();
         void InstallCoreCallbacks();
@@ -28,6 +33,10 @@ namespace winrt::Auvol::implementation
         void UpdateStats(std::string const& text);
         void UpdateRunning(bool running);
         void UpdateMode(int mode);
+        void UpdateAutoFollow(bool enabled,
+                              std::string const& followedOutputName,
+                              std::string const& currentOutputName,
+                              bool currentOutputAvailable);
         void ResetStats();
         bool PeerAddressIsValid();
         std::string PeerAddress();

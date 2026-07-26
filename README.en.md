@@ -68,6 +68,23 @@ On Windows, choose a role and press **Start** once. Changing direction while Auv
 
 On Mac, choose **Receive from Windows** or **Send to Windows**. Mac send requires a one-time system-audio capture permission.
 
+### Follow headphones automatically
+
+Both apps can enable **Follow selected headphones automatically**. First make
+the headphones the current computer's default output, then choose “Use current
+output”:
+
+- When the selected headphones become the Mac default output, Auvol switches to
+  Windows → Mac.
+- When they become the Windows default output, Auvol switches to Mac → Windows.
+- A disconnect alone never guesses the opposite direction. Auvol waits until
+  the other computer has made the headphones its stable default output.
+- The output must remain stable for one second, filtering transient devices
+  exposed during Bluetooth reconnects.
+- A manual direction selection takes effect immediately and remains until the
+  next real headphone route change. Paused transport updates its selected
+  direction without starting.
+
 For unattended Windows launch:
 
 ```sh

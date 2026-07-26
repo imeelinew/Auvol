@@ -7,6 +7,7 @@ struct StatusView: View {
         VStack(alignment: .leading, spacing: 12) {
             header
             roleControl
+            autoFollowControl
             connection
             if engine.role == .send {
                 peerControl
@@ -48,6 +49,40 @@ struct StatusView: View {
         }
         .pickerStyle(.segmented)
         .labelsHidden()
+    }
+
+    private var autoFollowControl: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Toggle("自动跟随指定蓝牙耳机", isOn: Binding(
+                get: { engine.autoFollowEnabled },
+                set: { engine.setAutoFollowEnabled($0) }
+            ))
+            HStack {
+                Text(autoFollowDescription)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(2)
+                Spacer()
+                if engine.currentSystemOutputIsBluetooth &&
+                    engine.currentSystemOutputName != engine.followedOutputName {
+                    Button("使用当前输出") {
+                        engine.followCurrentBluetoothOutput()
+                    }
+                    .buttonStyle(.borderless)
+                    .font(.caption2)
+                }
+            }
+        }
+    }
+
+    private var autoFollowDescription: String {
+        if !engine.autoFollowEnabled {
+            return "关闭时仅响应手动方向切换。"
+        }
+        if engine.followedOutputName.isEmpty {
+            return "等待蓝牙耳机成为 Mac 默认输出。"
+        }
+        return "正在跟随：\(engine.followedOutputName)"
     }
 
     private var connection: some View {

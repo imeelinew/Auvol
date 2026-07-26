@@ -109,6 +109,7 @@ namespace
             { "Listening for Mac audio on UDP 7777", "正在通过 UDP 7777 等待 Mac 音频。" },
             { "Recovering automatically...", "正在自动恢复音频传输…" },
             { "Switching direction automatically...", "正在自动切换传输方向…" },
+            { "Selected headphones are on Windows; switching direction...", "指定耳机已成为 Windows 默认输出，正在切换接收端…" },
         };
         for (auto const& translation : translations) {
             if (value == translation.english) {
@@ -150,7 +151,7 @@ namespace winrt::Auvol::implementation
         const UINT dpi = GetDpiForWindow(m_hwnd);
         const double scale = static_cast<double>(dpi) / 96.0;
         const int width = static_cast<int>(760 * scale);
-        const int height = static_cast<int>(800 * scale);
+        const int height = static_cast<int>(880 * scale);
         SetWindowPos(m_hwnd, nullptr, 0, 0, width, height,
                      SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
 
@@ -199,6 +200,27 @@ namespace winrt::Auvol::implementation
                 dispatcher.TryEnqueue([weak, mode] {
                     if (const auto self = weak.get()) self->UpdateMode(mode);
                 });
+            },
+            [dispatcher, weak](bool enabled,
+                               std::string followedOutputName,
+                               std::string currentOutputName,
+                               bool currentOutputAvailable) {
+                dispatcher.TryEnqueue([
+                    weak,
+                    enabled,
+                    followedOutputName = std::move(followedOutputName),
+                    currentOutputName = std::move(currentOutputName),
+                    currentOutputAvailable
+                ] {
+                    if (const auto self = weak.get()) {
+                        self->UpdateAutoFollow(
+                            enabled,
+                            followedOutputName,
+                            currentOutputName,
+                            currentOutputAvailable
+                        );
+                    }
+                });
             });
     }
 
@@ -218,7 +240,16 @@ namespace winrt::Auvol::implementation
         PeerIpTextBox().Text(winrt::to_hstring(peer));
         SendModeButton().IsChecked(m_mode == 0);
         ReceiveModeButton().IsChecked(m_mode == 1);
+        m_applyingAutoFollow = true;
+        AutoFollowToggle().IsOn(settings.autoFollowEnabled);
+        m_applyingAutoFollow = false;
+        FollowedOutputText().Text(settings.followedOutputName.empty()
+            ? L"尚未选择耳机；启用后会采用当前的耳机输出。"
+            : winrt::to_hstring("正在跟随：" + settings.followedOutputName));
+        CurrentOutputText().Text(L"正在检测 Windows 默认输出…");
+        UseCurrentOutputButton().IsEnabled(false);
         auvol::StartDirectionControl(peer);
+        auvol::StartAutoDirectionMonitor();
 
         if ((!commandPeer.empty() || settings.running) && PeerAddressIsValid()) {
             auvol::Start(PeerAddress(), m_mode);
@@ -270,6 +301,23 @@ namespace winrt::Auvol::implementation
         }
         if (!m_running) {
             TransportButton().IsEnabled(PeerAddressIsValid());
+        }
+    }
+
+    void MainWindow::AutoFollowToggle_Toggled(IInspectable const&,
+                                               RoutedEventArgs const&)
+    {
+        if (m_applyingAutoFollow) return;
+        auvol::SetAutoFollowEnabled(AutoFollowToggle().IsOn());
+    }
+
+    void MainWindow::UseCurrentOutputButton_Click(IInspectable const&,
+                                                   RoutedEventArgs const&)
+    {
+        if (!auvol::UseCurrentOutputForAutoFollow()) {
+            TransportInfoBar().Severity(InfoBarSeverity::Warning);
+            TransportInfoBar().Title(L"没有可用输出");
+            TransportInfoBar().Message(L"请先让耳机成为 Windows 默认输出。");
         }
     }
 
@@ -349,6 +397,23 @@ namespace winrt::Auvol::implementation
         RateLabel().Text(m_mode == 0 ? L"采集速率（帧/秒）" : L"播放速率（帧/秒）");
         ResetStats();
         auvol::SaveSettings(PeerAddress(), m_mode, m_running);
+    }
+
+    void MainWindow::UpdateAutoFollow(bool enabled,
+                                      std::string const& followedOutputName,
+                                      std::string const& currentOutputName,
+                                      bool currentOutputAvailable)
+    {
+        m_applyingAutoFollow = true;
+        AutoFollowToggle().IsOn(enabled);
+        m_applyingAutoFollow = false;
+        FollowedOutputText().Text(followedOutputName.empty()
+            ? L"尚未选择耳机；启用后会采用当前的耳机输出。"
+            : winrt::to_hstring("正在跟随：" + followedOutputName));
+        CurrentOutputText().Text(currentOutputAvailable
+            ? winrt::to_hstring("当前默认输出：" + currentOutputName)
+            : L"当前没有可用的默认输出。");
+        UseCurrentOutputButton().IsEnabled(currentOutputAvailable);
     }
 
     void MainWindow::ResetStats()
