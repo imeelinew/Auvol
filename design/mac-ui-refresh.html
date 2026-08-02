@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Auvol · macOS 菜单栏 UI 精修方案</title>
+<style>
+  :root {
+    --doc-bg: #f2f1ee;
+    --doc-ink: #1b1a18;
+    --doc-muted: #6d6a63;
+    --doc-line: #dcd9d2;
+    --doc-card: #fbfaf7;
+    --accent: #0a6cd0;
+    --bad: #c0392b;
+    --good: #1c7a45;
+    --font: -apple-system, "SF Pro Text", "Helvetica Neue", "PingFang SC", "Segoe UI", sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: var(--font);
+    color: var(--doc-ink);
+    background:
+      radial-gradient(1100px 520px at 8% -8%, #f7f2e7 0%, transparent 55%),
+      radial-gradient(900px 480px at 100% 0%, #e2ebf5 0%, transparent 52%),
+      var(--doc-bg);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page { max-width: 1320px; margin: 0 auto; padding: 44px 28px 96px; }
+
+  h1 { margin: 0 0 10px; font-size: 30px; font-weight: 680; letter-spacing: -0.022em; }
+  .lede { margin: 0 0 8px; max-width: 74ch; color: var(--doc-muted); font-size: 15px; }
+  .lede strong { color: var(--doc-ink); font-weight: 600; }
+
+  .doc-section { margin-top: 52px; }
+  .doc-section > h2 {
+    margin: 0 0 6px; font-size: 20px; font-weight: 640; letter-spacing: -0.015em;
+    display: flex; align-items: baseline; gap: 10px;
+  }
+  .doc-section > h2 .num {
+    font-size: 12px; font-weight: 620; color: var(--accent);
+    font-variant-numeric: tabular-nums; letter-spacing: 0.06em;
+  }
+  .doc-section > .sub { margin: 0 0 22px; color: var(--doc-muted); font-size: 14px; max-width: 76ch; }
+
+  .grid { display: grid; gap: 14px; }
+  .grid.c3 { grid-template-columns: repeat(3, 1fr); }
+  .grid.c4 { grid-template-columns: repeat(4, 1fr); }
+  .grid.c2 { grid-template-columns: repeat(2, 1fr); }
+  @media (max-width: 1100px) { .grid.c3, .grid.c4 { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 720px)  { .grid.c2, .grid.c3, .grid.c4 { grid-template-columns: 1fr; } }
+
+  .note {
+    background: var(--doc-card); border: 1px solid var(--doc-line);
+    border-radius: 13px; padding: 15px 17px;
+  }
+  .note h3 { margin: 0 0 7px; font-size: 13.5px; font-weight: 640; display: flex; gap: 8px; align-items: center; }
+  .note p  { margin: 0; font-size: 13px; color: #4b4842; }
+  .note p + p { margin-top: 7px; }
+  .note code { font-family: var(--mono); font-size: 12px; background: rgba(0,0,0,.055); padding: 1px 5px; border-radius: 4px; }
+
+  .badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 19px; height: 19px; padding: 0 6px; border-radius: 6px;
+    font-size: 11px; font-weight: 660; font-variant-numeric: tabular-nums;
+    background: rgba(192,57,43,.12); color: var(--bad);
+  }
+  .badge.ok { background: rgba(28,122,69,.12); color: var(--good); }
+  .badge.ac { background: rgba(10,108,208,.12); color: var(--accent); }
+
+  ul.tight { margin: 0; padding-left: 17px; font-size: 13px; color: #4b4842; }
+  ul.tight li + li { margin-top: 6px; }
+  ul.tight strong { color: var(--doc-ink); font-weight: 600; }
+
+  table.spec { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--doc-card);
+    border: 1px solid var(--doc-line); border-radius: 13px; overflow: hidden; }
+  table.spec th, table.spec td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--doc-line); vertical-align: top; }
+  table.spec tr:last-child td { border-bottom: 0; }
+  table.spec th { font-weight: 620; font-size: 12px; color: var(--doc-muted); background: rgba(0,0,0,.022); }
+  table.spec td.k { font-family: var(--mono); font-size: 12px; white-space: nowrap; }
+  table.spec td.v { color: #4b4842; }
+
+  /* ── toolbar ─────────────────────────────────────────── */
+  .toolbar {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    margin: 0 0 22px; padding: 10px 14px;
+    background: var(--doc-card); border: 1px solid var(--doc-line); border-radius: 12px;
+  }
+  .toolbar label { font-size: 12px; font-weight: 620; color: var(--doc-muted); }
+  .segbar { display: inline-flex; background: rgba(0,0,0,.055); border-radius: 8px; padding: 2px; gap: 2px; }
+  .segbar button {
+    appearance: none; border: 0; background: transparent; cursor: pointer;
+    font: inherit; font-size: 12px; font-weight: 540; color: #4b4842;
+    padding: 5px 12px; border-radius: 6px; transition: .14s;
+  }
+  .segbar button.active { background: #fff; color: var(--doc-ink); box-shadow: 0 1px 2px rgba(0,0,0,.14); }
+  .toolbar .hint { font-size: 12px; color: var(--doc-muted); }
+
+  /* ── stage: desktop + menu bar + popover ─────────────── */
+  .shots { display: flex; flex-wrap: wrap; gap: 26px; align-items: flex-start; }
+  figure.shot { margin: 0; }
+  figure.shot figcaption {
+    margin-top: 11px; font-size: 12.5px; color: var(--doc-muted); max-width: 380px;
+  }
+  figure.shot figcaption strong { color: var(--doc-ink); font-weight: 620; display: block; margin-bottom: 2px; font-size: 13px; }
+
+  .wall {
+    position: relative; width: 380px; padding: 0 0 26px;
+    border-radius: 14px; overflow: hidden;
+    box-shadow: 0 2px 6px rgba(0,0,0,.10), 0 18px 44px rgba(0,0,0,.14);
+    background:
+      radial-gradient(120% 80% at 15% 0%, #cfe0f4 0%, transparent 60%),
+      radial-gradient(120% 90% at 90% 10%, #f3dfe9 0%, transparent 55%),
+      linear-gradient(165deg, #dfe9f3 0%, #eef0ea 45%, #e6dfd4 100%);
+  }
+  .wall[data-theme="dark"] {
+    background:
+      radial-gradient(120% 80% at 15% 0%, #2b3a55 0%, transparent 60%),
+      radial-gradient(120% 90% at 90% 10%, #3d2b3f 0%, transparent 55%),
+      linear-gradient(165deg, #1e2632 0%, #191a20 48%, #241f1c 100%);
+  }
+
+  .menubar {
+    height: 26px; display: flex; align-items: center; justify-content: flex-end;
+    gap: 13px; padding: 0 12px;
+    background: rgba(255,255,255,.42);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(180%);
+    border-bottom: .5px solid rgba(0,0,0,.08);
+  }
+  .wall[data-theme="dark"] .menubar { background: rgba(28,28,32,.5); border-bottom-color: rgba(255,255,255,.09); }
+  .menubar .mb-item { width: 14px; height: 14px; color: rgba(0,0,0,.68); display: grid; place-items: center; }
+  .wall[data-theme="dark"] .menubar .mb-item { color: rgba(255,255,255,.8); }
+  .menubar .mb-item svg { width: 14px; height: 14px; }
+  .menubar .mb-item.host {
+    width: 26px; border-radius: 6px;
+    background: rgba(0,0,0,.085);
+  }
+  .wall[data-theme="dark"] .menubar .mb-item.host { background: rgba(255,255,255,.14); }
+  .menubar .mb-clock { font-size: 11px; font-weight: 500; color: rgba(0,0,0,.72); font-variant-numeric: tabular-nums; }
+  .wall[data-theme="dark"] .menubar .mb-clock { color: rgba(255,255,255,.85); }
+
+  /* ══════════════════════════════════════════════════════
+     THE POPOVER  —  1 css px = 1 pt
+     ══════════════════════════════════════════════════════ */
+  .pop {
+    --ink:        #17171a;
+    --ink-2:      rgba(0,0,0,.52);
+    --ink-3:      rgba(0,0,0,.34);
+    --card-bg:    rgba(255,255,255,.62);
+    --card-br:    rgba(0,0,0,.055);
+    --sep:        rgba(0,0,0,.072);
+    --track:      rgba(0,0,0,.085);
+    --tile-bg:    rgba(0,0,0,.055);
+    --pop-bg:     rgba(246,246,249,.76);
+    --blue:       #0a7aff;
+    --orange:     #f08a00;
+    --red:        #e0322a;
+    --shadow:     0 0 0 .5px rgba(0,0,0,.13), 0 10px 34px rgba(0,0,0,.20), 0 2px 6px rgba(0,0,0,.10);
+
+    position: relative; width: 320px; margin: 8px auto 0;
+    border-radius: 15px; padding: 12px 14px 12px;
+    color: var(--ink);
+    background: var(--pop-bg);
+    -webkit-backdrop-filter: blur(46px) saturate(180%);
+    backdrop-filter: blur(46px) saturate(180%);
+    box-shadow: var(--shadow);
+    font-size: 13px;
+  }
+  .pop[data-theme="dark"] {
+    --ink:     #f3f3f6;
+    --ink-2:   rgba(255,255,255,.56);
+    --ink-3:   rgba(255,255,255,.36);
+    --card-bg: rgba(255,255,255,.055);
+    --card-br: rgba(255,255,255,.075);
+    --sep:     rgba(255,255,255,.082);
+    --track:   rgba(255,255,255,.12);
+    --tile-bg: rgba(255,255,255,.09);
+    --pop-bg:  rgba(42,42,47,.74);
+    --blue:    #0a84ff;
+    --orange:  #ff9f0a;
+    --red:     #ff453a;
+    --shadow:  0 0 0 .5px rgba(255,255,255,.10), 0 10px 34px rgba(0,0,0,.42), 0 2px 6px rgba(0,0,0,.28);
+  }
+  /* --tone 表达传输状态；--ctl 是系统强调色，控件恒用它 */
+  .pop[data-tone="blue"]   { --tone: var(--blue); }
+  .pop[data-tone="orange"] { --tone: var(--orange); }
+  .pop[data-tone="red"]    { --tone: var(--red); }
+  .pop { --ctl: var(--blue); }
+
+  /* ── hero ─────────────────────────────── */
+  .hero {
+    border-radius: 11px; padding: 9px 11px 11px;
+    background: color-mix(in srgb, var(--tone) 8%, transparent);
+    box-shadow: inset 0 0 0 .5px color-mix(in srgb, var(--tone) 20%, transparent);
+    margin-bottom: 10px;
+  }
+  .hero-top { display: flex; align-items: center; gap: 8px; }
+  .app-tile {
+    width: 22px; height: 22px; border-radius: 6.5px; flex: none;
+    display: grid; place-items: center; color: #fff;
+    background: linear-gradient(160deg, color-mix(in srgb, var(--tone) 88%, #fff 12%), var(--tone));
+    box-shadow: 0 1px 2.5px color-mix(in srgb, var(--tone) 45%, transparent), inset 0 .5px 0 rgba(255,255,255,.45);
+  }
+  .app-tile svg { width: 13px; height: 13px; }
+  .wordmark { font-size: 13.5px; font-weight: 600; letter-spacing: -.012em; }
+  .pill {
+    margin-left: auto; display: inline-flex; align-items: center; gap: 5px;
+    height: 19px; padding: 0 8px 0 7px; border-radius: 9.5px;
+    background: color-mix(in srgb, var(--tone) 15%, transparent);
+    color: color-mix(in srgb, var(--tone) 88%, var(--ink));
+    font-size: 10.5px; font-weight: 620; letter-spacing: -.005em;
+  }
+  .pill .dot {
+    width: 5.5px; height: 5.5px; border-radius: 50%; background: var(--tone); flex: none;
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--tone) 60%, transparent);
+  }
+  .pop[data-live="1"] .pill .dot { animation: pulse 2.1s ease-out infinite; }
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 0   color-mix(in srgb, var(--tone) 55%, transparent); }
+    70%  { box-shadow: 0 0 0 5px color-mix(in srgb, var(--tone) 0%,  transparent); }
+    100% { box-shadow: 0 0 0 0   color-mix(in srgb, var(--tone) 0%,  transparent); }
+  }
+  .hero-status { margin: 3px 0 0 30px; font-size: 11.5px; color: var(--ink-2); letter-spacing: -.005em; }
+
+  /* meter */
+  .meter-row { display: flex; align-items: center; gap: 9px; margin: 9px 0 0; }
+  .meter {
+    position: relative; flex: 1; height: 4px; border-radius: 2px;
+    background: var(--track); overflow: hidden;
+  }
+  .meter .fill {
+    position: absolute; inset: 0 auto 0 0; border-radius: 2px;
+    background: linear-gradient(90deg, var(--tone), color-mix(in srgb, var(--tone) 55%, #5ac8fa));
+    transition: width .09s linear;
+  }
+  .meter .peak {
+    position: absolute; top: 0; bottom: 0; width: 1.5px; border-radius: 1px;
+    background: color-mix(in srgb, var(--tone) 85%, #fff);
+    transition: left .28s ease-out;
+  }
+  .meter.muted .fill { background: var(--ink-3); }
+  .meter-val {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 500;
+    color: var(--ink-2); font-variant-numeric: tabular-nums;
+    min-width: 52px; text-align: right; flex: none;
+  }
+
+  /* ── segmented ────────────────────────── */
+  .seg {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 2px;
+    padding: 2px; border-radius: 8px; background: var(--track);
+    margin-bottom: 10px;
+  }
+  .seg button {
+    appearance: none; border: 0; cursor: pointer; font: inherit;
+    height: 24px; border-radius: 6.5px; background: transparent;
+    color: var(--ink-2); font-size: 11.5px; font-weight: 530; letter-spacing: -.008em;
+    display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+    transition: .16s;
+  }
+  .seg button svg { width: 11px; height: 11px; opacity: .8; }
+  .seg button.on {
+    background: color-mix(in srgb, var(--pop-bg) 30%, #fff);
+    color: var(--ink); font-weight: 590;
+    box-shadow: 0 .5px 2px rgba(0,0,0,.16), 0 0 0 .5px rgba(0,0,0,.045);
+  }
+  .pop[data-theme="dark"] .seg button.on {
+    background: rgba(255,255,255,.19);
+    box-shadow: 0 .5px 2px rgba(0,0,0,.4), 0 0 0 .5px rgba(255,255,255,.07);
+  }
+
+  /* ── card / rows ──────────────────────── */
+  .card {
+    border-radius: 11px; background: var(--card-bg);
+    box-shadow: inset 0 0 0 .5px var(--card-br);
+    margin-bottom: 10px; overflow: hidden;
+  }
+  .row { display: flex; align-items: center; gap: 10px; padding: 8px 11px; min-height: 40px; position: relative; }
+  .row + .row::before {
+    content: ""; position: absolute; left: 43px; right: 0; top: 0; height: .5px; background: var(--sep);
+  }
+  .row.no-icon + .row.no-icon::before,
+  .row.no-icon::before { left: 11px; }
+  .row.stack { flex-direction: column; align-items: stretch; gap: 7px; }
+
+  .tile {
+    width: 22px; height: 22px; border-radius: 6px; flex: none;
+    display: grid; place-items: center;
+    background: var(--tile-bg); color: var(--ink-2);
+  }
+  .tile svg { width: 13px; height: 13px; }
+  .tile.tinted { background: color-mix(in srgb, var(--ctl) 15%, transparent); color: var(--ctl); }
+
+  .row-text { min-width: 0; flex: 1; display: block; }
+  .row-title { display: block; font-size: 12.5px; font-weight: 500; letter-spacing: -.008em; line-height: 1.3; }
+  .row-sub {
+    display: block; font-size: 10.5px; line-height: 1.3;
+    color: var(--ink-3); margin-top: 1px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .row-val {
+    font-size: 12px; font-weight: 500; color: var(--ink-2); flex: none;
+    max-width: 168px; text-align: right;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
+  }
+  .row-val.mono { font-family: var(--mono); font-size: 11px; }
+  .row-val.good { color: var(--ink-2); }
+  .row-val.warn { color: var(--red); font-weight: 560; }
+
+  /* switch */
+  .sw {
+    appearance: none; border: 0; cursor: pointer; flex: none;
+    width: 30px; height: 18px; border-radius: 9px; padding: 0;
+    background: var(--track); position: relative; transition: background .18s;
+  }
+  .sw::after {
+    content: ""; position: absolute; top: 2px; left: 2px;
+    width: 14px; height: 14px; border-radius: 50%; background: #fff;
+    box-shadow: 0 .5px 1.5px rgba(0,0,0,.3); transition: transform .18s;
+  }
+  .sw.on { background: var(--ctl); }
+  .sw.on::after { transform: translateX(12px); }
+
+  /* slider */
+  .slider { position: relative; height: 14px; display: flex; align-items: center; }
+  .slider .strack { position: absolute; left: 0; right: 0; height: 3px; border-radius: 1.5px; background: var(--track); }
+  .slider .sfill  { position: absolute; left: 0; height: 3px; border-radius: 1.5px; background: var(--ctl); }
+  .slider .sknob  {
+    position: absolute; width: 13px; height: 13px; border-radius: 50%;
+    background: #fff; box-shadow: 0 .5px 2px rgba(0,0,0,.32), 0 0 0 .5px rgba(0,0,0,.06);
+    transform: translateX(-50%); cursor: grab;
+  }
+  .slider input {
+    appearance: none; -webkit-appearance: none; position: absolute; inset: -6px 0;
+    width: 100%; height: 26px; margin: 0; background: transparent; cursor: pointer; opacity: 0;
+  }
+  .scale { display: flex; justify-content: space-between; margin-top: 5px; font-size: 9.5px; color: var(--ink-3); }
+
+  /* text field */
+  .field {
+    flex: none; width: 138px; height: 22px; border-radius: 6px; padding: 0 8px;
+    font: inherit; font-size: 11.5px; font-family: var(--mono);
+    color: var(--ink); background: color-mix(in srgb, var(--pop-bg) 40%, #fff);
+    border: .5px solid var(--card-br); outline: none;
+    box-shadow: inset 0 .5px 1.5px rgba(0,0,0,.06);
+  }
+  .pop[data-theme="dark"] .field { background: rgba(0,0,0,.24); }
+  .field:focus { box-shadow: 0 0 0 2.5px color-mix(in srgb, var(--ctl) 28%, transparent); border-color: var(--ctl); }
+
+  /* footer */
+  .foot { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+  .btn {
+    appearance: none; border: 0; cursor: pointer; font: inherit;
+    height: 25px; padding: 0 14px; border-radius: 12.5px;
+    font-size: 11.5px; font-weight: 560; letter-spacing: -.006em;
+    display: inline-flex; align-items: center; gap: 5px; transition: .14s;
+  }
+  .btn svg { width: 10px; height: 10px; }
+  .btn.ghost { background: transparent; color: var(--ink-3); padding: 0 8px; }
+  .btn.ghost:hover { color: var(--ink-2); background: var(--track); }
+  .btn.primary {
+    margin-left: auto; color: #fff;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--ctl) 90%, #fff 10%), var(--ctl));
+    box-shadow: 0 .5px 2px color-mix(in srgb, var(--ctl) 45%, transparent), inset 0 .5px 0 rgba(255,255,255,.35);
+  }
+  .btn.secondary {
+    margin-left: auto; color: var(--ink);
+    background: color-mix(in srgb, var(--pop-bg) 30%, #fff);
+    box-shadow: 0 .5px 2px rgba(0,0,0,.14), 0 0 0 .5px rgba(0,0,0,.06);
+  }
+  .pop[data-theme="dark"] .btn.secondary { background: rgba(255,255,255,.15); box-shadow: 0 .5px 2px rgba(0,0,0,.35); }
+
+  .err {
+    margin: 0 0 10px; padding: 7px 10px; border-radius: 9px;
+    font-size: 11px; line-height: 1.35;
+    background: color-mix(in srgb, var(--red) 12%, transparent);
+    color: color-mix(in srgb, var(--red) 85%, var(--ink));
+    box-shadow: inset 0 0 0 .5px color-mix(in srgb, var(--red) 25%, transparent);
+    display: flex; gap: 7px; align-items: flex-start;
+  }
+  .err svg { width: 12px; height: 12px; flex: none; margin-top: .5px; }
+
+  /* ══════════════════════════════════════════════════════
+     "BEFORE" — faithful replica of today's StatusView
+     ══════════════════════════════════════════════════════ */
+  .old {
+    width: 320px; margin: 8px auto 0; border-radius: 15px;
+    padding: 16px 20px; color: #17171a; font-size: 13px;
+    background: rgba(246,246,249,.76);
+    -webkit-backdrop-filter: blur(46px) saturate(180%);
+    backdrop-filter: blur(46px) saturate(180%);
+    box-shadow: 0 0 0 .5px rgba(0,0,0,.13), 0 10px 34px rgba(0,0,0,.20);
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .old-head { display: flex; align-items: center; }
+  .old-head b { font-size: 13px; font-weight: 640; }
+  .old-head .d { margin-left: auto; width: 8px; height: 8px; border-radius: 50%; background: #0a7aff; }
+  .old-seg {
+    display: grid; grid-template-columns: 1fr 1fr; height: 22px;
+    border-radius: 6px; overflow: hidden; box-shadow: 0 0 0 .5px rgba(0,0,0,.13), 0 .5px 1.5px rgba(0,0,0,.14);
+  }
+  .old-seg span { display: grid; place-items: center; font-size: 12px; background: #fdfdfd; }
+  .old-seg span.on { background: #0a7aff; color: #fff; font-weight: 500; }
+  .old-check { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+  .old-check i {
+    width: 14px; height: 14px; border-radius: 3.5px; background: #0a7aff;
+    display: grid; place-items: center; flex: none;
+    box-shadow: inset 0 .5px 0 rgba(255,255,255,.4);
+  }
+  .old-check i svg { width: 9px; height: 9px; color: #fff; }
+  .old-c2 { font-size: 10px; color: rgba(0,0,0,.32); }
+  .old-cap { font-size: 11px; color: rgba(0,0,0,.5); }
+  .old-hr { height: .5px; background: rgba(0,0,0,.13); }
+  .old-stat { display: flex; font-size: 11px; font-variant-numeric: tabular-nums; }
+  .old-stat span:first-child { color: rgba(0,0,0,.5); }
+  .old-stat span:last-child { margin-left: auto; }
+  .old-slider { position: relative; height: 20px; display: flex; align-items: center; }
+  .old-slider .t { position: absolute; left: 0; right: 0; height: 4px; border-radius: 2px; background: rgba(0,0,0,.1); }
+  .old-slider .f { position: absolute; left: 0; width: 6%; height: 4px; border-radius: 2px; background: #0a7aff; }
+  .old-slider .ticks {
+    position: absolute; left: 8%; right: 0; height: 4px;
+    background-image: radial-gradient(circle, rgba(0,0,0,.28) 1px, transparent 1.2px);
+    background-size: 6px 4px; background-position: center;
+  }
+  .old-slider .k {
+    position: absolute; left: 6%; width: 16px; height: 16px; border-radius: 50%;
+    background: #fff; transform: translateX(-50%); box-shadow: 0 .5px 2px rgba(0,0,0,.35), 0 0 0 .5px rgba(0,0,0,.08);
+  }
+  .old-foot { display: flex; gap: 14px; justify-content: flex-end; font-size: 13px; color: #17171a; }
+
+  /* annotations */
+  .anno { position: absolute; z-index: 5; pointer-events: none; }
+  .anno .bub {
+    background: #c0392b; color: #fff; font-size: 10.5px; font-weight: 620;
+    padding: 2px 7px; border-radius: 5px; white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0,0,0,.28);
+  }
+
+  .kbd { font-family: var(--mono); font-size: 11.5px; background: rgba(0,0,0,.055); padding: 1.5px 6px; border-radius: 5px; }
+
+  /* windows mock */
+  .win {
+    width: 460px; border-radius: 9px; overflow: hidden;
+    background: linear-gradient(180deg, #f6f4f2, #f1efee);
+    box-shadow: 0 0 0 1px rgba(0,0,0,.10), 0 16px 40px rgba(0,0,0,.16);
+    font-size: 13px; color: #1b1b1b;
+  }
+  .win-bar { height: 32px; display: flex; align-items: center; gap: 8px; padding: 0 0 0 12px; font-size: 12px; }
+  .win-bar .ic { width: 16px; height: 16px; border-radius: 4px; background: linear-gradient(160deg,#3b9dff,#0a6cd0); display: grid; place-items: center; color: #fff; }
+  .win-bar .ic svg { width: 10px; height: 10px; }
+  .win-bar .tr { margin-left: auto; display: flex; }
+  .win-bar .tr span { width: 44px; height: 32px; display: grid; place-items: center; font-size: 10px; color: #444; }
+  .win-body { padding: 8px 20px 20px; }
+  .win-h { font-size: 13px; font-weight: 620; margin: 14px 0 8px; }
+  .win-card { background: #fdfdfd; border: 1px solid rgba(0,0,0,.06); border-radius: 8px; overflow: hidden; }
+  .win-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
+  .win-row + .win-row { border-top: 1px solid rgba(0,0,0,.06); }
+  .win-row .gl { width: 18px; color: #5c5c5c; display: grid; place-items: center; }
+  .win-row .gl svg { width: 15px; height: 15px; }
+  .win-row .tx { flex: 1; min-width: 0; }
+  .win-row .tx b { font-size: 12.5px; font-weight: 620; display: block; }
+  .win-row .tx small { font-size: 11px; color: #6a6a6a; }
+  .win-pill {
+    display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 10px;
+    border-radius: 4px; font-size: 11.5px; font-weight: 620;
+    background: rgba(10,108,208,.11); color: #0a5cad;
+  }
+  .win-pill .d { width: 6px; height: 6px; border-radius: 50%; background: #0a6cd0; }
+  .win-meter { flex: 1; height: 4px; border-radius: 2px; background: rgba(0,0,0,.09); position: relative; overflow: hidden; max-width: 150px; }
+  .win-meter i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg,#0a6cd0,#3aa0e8); border-radius: 2px; }
+  .win-selbar { display: flex; gap: 4px; }
+  .win-selbar span {
+    position: relative; padding: 6px 12px 8px; font-size: 12px; color: #444; cursor: default;
+    display: inline-flex; align-items: center; gap: 7px; border-radius: 4px;
+  }
+  .win-selbar span svg { width: 14px; height: 14px; }
+  .win-selbar span.on { color: #0a5cad; font-weight: 600; background: rgba(0,0,0,.035); }
+  .win-selbar span.on::after {
+    content: ""; position: absolute; left: 12px; right: 12px; bottom: 2px; height: 2.5px;
+    border-radius: 2px; background: #0a6cd0;
+  }
+  .win-btn { height: 30px; padding: 0 18px; border-radius: 4px; font-size: 12.5px; font-weight: 600;
+    background: linear-gradient(180deg,#2a86e0,#0a6cd0); color: #fff; border: 0; display: inline-flex; align-items: center; gap: 7px; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-wave" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round">
+      <path d="M4.3 5.6a3.6 3.6 0 0 1 0 4.8"/>
+      <path d="M7.5 3.9a6.4 6.4 0 0 1 0 8.2"/>
+      <path d="M10.7 2.2a9.2 9.2 0 0 1 0 11.6"/>
+    </symbol>
+    <symbol id="i-headphones" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3.1 10.4V8.3a4.9 4.9 0 0 1 9.8 0v2.1"/>
+      <rect x="1.9" y="9.4" width="2.7" height="4.5" rx="1.35"/>
+      <rect x="11.4" y="9.4" width="2.7" height="4.5" rx="1.35"/>
+    </symbol>
+    <symbol id="i-speaker" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M7.6 3 4.7 5.7H2.3v4.6h2.4l2.9 2.7z" fill="currentColor" stroke-width="1.2"/>
+      <path d="M10.3 6.2a2.9 2.9 0 0 1 0 3.6"/>
+      <path d="M12.4 4.4a5.6 5.6 0 0 1 0 7.2"/>
+    </symbol>
+    <symbol id="i-globe" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+      <circle cx="8" cy="8" r="5.7"/>
+      <path d="M2.4 8h11.2"/>
+      <path d="M8 2.3c1.65 1.75 2.5 3.6 2.5 5.7S9.65 12 8 13.7C6.35 12 5.5 10.1 5.5 8s.85-3.95 2.5-5.7z"/>
+    </symbol>
+    <symbol id="i-cable" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="2.2" y="3.4" width="11.6" height="7.6" rx="1.6"/>
+      <path d="M5.4 13.4h5.2"/><path d="M8 11v2.4"/>
+    </symbol>
+    <symbol id="i-timer" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round">
+      <circle cx="8" cy="9" r="5.1"/>
+      <path d="M8 6.2V9l1.9 1.4"/>
+      <path d="M6.2 2.1h3.6"/>
+    </symbol>
+    <symbol id="i-pause" viewBox="0 0 16 16" fill="currentColor">
+      <rect x="4" y="3" width="3.1" height="10" rx="1.2"/><rect x="8.9" y="3" width="3.1" height="10" rx="1.2"/>
+    </symbol>
+    <symbol id="i-play" viewBox="0 0 16 16" fill="currentColor">
+      <path d="M5 3.4c0-.8.85-1.28 1.52-.87l6.1 3.72a1 1 0 0 1 0 1.71l-6.1 3.72A1.02 1.02 0 0 1 5 10.8z"/>
+    </symbol>
+    <symbol id="i-down" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M8 3v9"/><path d="M4.4 8.6 8 12.2l3.6-3.6"/>
+    </symbol>
+    <symbol id="i-up" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M8 13V4"/><path d="M4.4 7.4 8 3.8l3.6 3.6"/>
+    </symbol>
+    <symbol id="i-warn" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+      <path d="M8 2.6 14.4 13.4H1.6z" stroke-linejoin="round"/>
+      <path d="M8 6.5v3.1"/><circle cx="8" cy="11.6" r=".8" fill="currentColor" stroke="none"/>
+    </symbol>
+    <symbol id="i-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3.2 8.4 6.4 11.6 12.8 4.6"/>
+    </symbol>
+    <symbol id="i-wifi" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+      <path d="M1.9 6.1a9 9 0 0 1 12.2 0"/><path d="M4.3 8.6a5.6 5.6 0 0 1 7.4 0"/>
+      <circle cx="8" cy="11.8" r="1.1" fill="currentColor" stroke="none"/>
+    </symbol>
+    <symbol id="i-bt" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M5 4.6 11 11 8 13.6V2.4L11 5 5 11.4"/>
+    </symbol>
+    <symbol id="i-battery" viewBox="0 0 24 16" fill="none" stroke="currentColor" stroke-width="1.3">
+      <rect x="1" y="3.5" width="18" height="9" rx="2.6"/>
+      <rect x="2.8" y="5.3" width="4" height="5.4" rx="1.2" fill="currentColor" stroke="none"/>
+      <path d="M20.6 6.6v2.8" stroke-linecap="round" stroke-width="2"/>
+    </symbol>
+    <symbol id="i-search" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+      <circle cx="7.2" cy="7.2" r="4.6"/><path d="M10.6 10.6 13.6 13.6"/>
+    </symbol>
+    <symbol id="i-control" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+      <path d="M3 4.2h10"/><path d="M3 11.8h10"/>
+      <circle cx="6" cy="4.2" r="1.7" fill="currentColor" stroke="none"/>
+      <circle cx="10.4" cy="11.8" r="1.7" fill="currentColor" stroke="none"/>
+    </symbol>
+    <symbol id="i-transfer" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M2.6 5.4h10.8"/><path d="M10.8 2.8 13.4 5.4 10.8 8"/>
+      <path d="M13.4 10.6H2.6"/><path d="M5.2 8 2.6 10.6 5.2 13.2"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="page">
+
+  <header>
+    <h1>Auvol · macOS 菜单栏 UI 精修方案</h1>
+    <p class="lede">
+      上一轮已经把两端的<strong>信息语义</strong>对齐了，这一轮只处理 macOS 的<strong>视觉表达</strong>：
+      控件选型、层级、间距、颜色和状态可视化。信息字段、交互流程、传输逻辑都不动，
+      所以改动全部收敛在 <code>mac/Auvol/StatusView.swift</code> 一个文件里。
+      Windows 只做三处小幅对齐，不动结构。
+    </p>
+    <p class="lede">
+      本页是可交互的高保真效果稿：方向切换、开关、滑杆都能点，电平条按真实动态刷新。
+      弹窗按 <strong>1 CSS px = 1 pt</strong> 绘制，在 Retina 屏上就是实际尺寸。
+    </p>
+  </header>
+
+  <!-- ═══════════ 1 诊断 ═══════════ -->
+  <section class="doc-section">
+    <h2><span class="num">01</span> 现状诊断</h2>
+    <p class="sub">按对界面「精致度」的影响从大到小排。前四条基本决定了整体观感。</p>
+    <div class="grid c4">
+      <article class="note">
+        <h3><span class="badge">1</span> 滑杆的刻度点</h3>
+        <p><code>Slider(in: 8...80, step: 1)</code> 让 AppKit 画出 72 个 tick dot。那条虚线点阵是目前最刺眼的元素，也是唯一一处「像调试面板」的地方。</p>
+        <p>改：去掉 <code>step</code>，在 setter 里取整。</p>
+      </article>
+      <article class="note">
+        <h3><span class="badge">2</span> 复选框样式的开关</h3>
+        <p>SwiftUI 的 <code>Toggle</code> 在 popover 里默认渲染成蓝色 checkbox，是「偏好设置对话框」的语汇，不是菜单栏语汇。</p>
+        <p>改：<code>.toggleStyle(.switch)</code>，并缩到 <code>.controlSize(.small)</code>。</p>
+      </article>
+      <article class="note">
+        <h3><span class="badge">3</span> 满宽实心蓝分段控件</h3>
+        <p>选中段整块填蓝，在 300pt 宽度里视觉重量过大，抢走了本该属于「当前状态」的注意力。</p>
+        <p>改：灰底轨道 + 白色浮起胶囊，蓝色只留给状态语义。</p>
+      </article>
+      <article class="note">
+        <h3><span class="badge">4</span> 三条全宽 Divider</h3>
+        <p>分组靠 <code>Divider()</code> 硬切，且切得不匀：自动跟随和连接之间没有分隔，缓冲前后各一条。看不出哪些字段属于同一组。</p>
+        <p>改：分组用圆角卡片，组内用缩进细线。</p>
+      </article>
+      <article class="note">
+        <h3><span class="badge">5</span> 字号层级压得太扁</h3>
+        <p><code>caption2 + .tertiary</code> 用得过多：耳机名「WF-1000XM5」和状态「已连接 · 传入音频静音」都是最弱的灰色小字，而它们其实是主信息。</p>
+      </article>
+      <article class="note">
+        <h3><span class="badge">6</span> 状态点没有说明</h3>
+        <p>右上角 8pt 圆点是唯一的全局状态指示，没有文字，颜色含义要靠记。下方还另有一行「链路」，两处状态互不呼应。</p>
+      </article>
+      <article class="note">
+        <h3><span class="badge">7</span> 音频 App 却没有电平表</h3>
+        <p>信号只有一行「静音」或 <code>-18.4 dBFS</code>。一个 4pt 的电平条能在 0.2 秒内回答「到底通没通」，是性价比最高的一处增强。</p>
+      </article>
+      <article class="note">
+        <h3><span class="badge">8</span> 底部两个同权重文字按钮</h3>
+        <p>「暂停」和「退出」都是 borderless 文字、同色同号、并排贴右下角。主操作和破坏性操作没有区分，还容易误点。</p>
+      </article>
+      <article class="note">
+        <h3><span class="badge">9</span> 完全没有图标</h3>
+        <p>Windows 每行都有 FontIcon 做视觉锚点，macOS 一个 SF Symbol 都没有，扫读时只能逐行读字。</p>
+      </article>
+      <article class="note">
+        <h3><span class="badge">10</span> 内容顶边</h3>
+        <p>文字直接贴在 popover 的毛玻璃上，没有承载面。所有行等宽等重，缺少「块」的概念。</p>
+      </article>
+      <article class="note">
+        <h3><span class="badge ac">·</span> 保持不变</h3>
+        <p>字段集合、中文文案、方向语义、菜单栏 <code>wave.3.forward</code> 三态配色，全部沿用上一轮的结论。</p>
+      </article>
+      <article class="note">
+        <h3><span class="badge ok">✓</span> 已经对的地方</h3>
+        <p>320pt 以内的窄弹窗定位、接收/发送两态复用同一布局、中文状态映射表，这些结构是对的，只换表现层。</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- ═══════════ 2 原则 ═══════════ -->
+  <section class="doc-section">
+    <h2><span class="num">02</span> 设计原则</h2>
+    <p class="sub">四条，用来在后续每个取舍上做判断。</p>
+    <div class="grid c4">
+      <article class="note">
+        <h3>① 一眼看状态</h3>
+        <p>打开弹窗后第一屏必须回答三件事：<strong>通没通、往哪个方向、有没有声音</strong>。
+          这三件事全部集中在顶部的状态区，其余都是次要信息。</p>
+      </article>
+      <article class="note">
+        <h3>② 颜色只表达状态</h3>
+        <p>蓝 / 橙 / 红只用于「传输中 / 已暂停 / 异常」，并且同时驱动菜单栏图标、状态胶囊、图标底色、电平条、滑杆和主按钮。
+          控件本身不主动用彩色。</p>
+      </article>
+      <article class="note">
+        <h3>③ 分组用面，不用线</h3>
+        <p>相关字段收进圆角卡片，卡片内部用缩进 0.5pt 细线；卡片之间用 10pt 留白。全宽 Divider 一条不留。</p>
+      </article>
+      <article class="note">
+        <h3>④ 沿用系统语汇</h3>
+        <p>参照「控制中心 / 系统设置」的行式布局：22pt 圆角图标块 + 标题/副标题 + 右侧控件。
+          不自造控件外形，只自造排布。</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- ═══════════ 3 对照 ═══════════ -->
+  <section class="doc-section">
+    <h2><span class="num">03</span> 改版对照</h2>
+    <p class="sub">同一场景：接收 Windows 音频、有线链路、自动跟随 WF-1000XM5、缓冲 12 ms。左边是现在，右边是方案。</p>
+
+    <div class="toolbar">
+      <label>显示比例</label>
+      <div class="segbar" id="zoomSeg">
+        <button type="button" data-zoom="1" class="active">1× 实际尺寸</button>
+        <button type="button" data-zoom="1.5">1.5×</button>
+        <button type="button" data-zoom="2">2× 放大看细节</button>
+      </div>
+      <span class="hint">1× 即 Retina 屏上的真实物理大小</span>
+    </div>
+
+    <div class="shots" id="compareShots">
+      <figure class="shot">
+        <div class="wall" data-theme="light">
+          <div class="menubar">
+            <div class="mb-item host"><svg viewBox="0 0 16 16"><use href="#i-wave"/></svg></div>
+            <div class="mb-item"><svg><use href="#i-bt"/></svg></div>
+            <div class="mb-item"><svg><use href="#i-wifi"/></svg></div>
+            <div class="mb-item"><svg viewBox="0 0 24 16" style="width:20px"><use href="#i-battery"/></svg></div>
+            <span class="mb-clock">周日 14:31</span>
+          </div>
+          <div class="old">
+            <div class="old-head"><b>Auvol</b><span class="d"></span></div>
+            <div class="old-seg"><span class="on">Windows → Mac</span><span>Mac → Windows</span></div>
+            <div>
+              <div class="old-check"><i><svg viewBox="0 0 16 16"><use href="#i-check"/></svg></i>自动跟随耳机</div>
+              <div class="old-c2" style="margin-top:5px">WF-1000XM5</div>
+            </div>
+            <div>
+              <div class="old-cap">正在播放 Windows 音频</div>
+              <div class="old-c2" style="margin-top:2px">169.254.190.152 · 有线</div>
+            </div>
+            <div class="old-hr"></div>
+            <div>
+              <div class="old-stat" style="margin-bottom:6px"><span>缓冲目标</span><span style="color:#17171a;font-size:11px">12 ms</span></div>
+              <div class="old-slider"><div class="t"></div><div class="ticks"></div><div class="f"></div><div class="k"></div></div>
+            </div>
+            <div class="old-hr"></div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <div class="old-stat"><span>播放设备</span><span>MacBook Air 扬声器</span></div>
+              <div class="old-stat"><span>信号</span><span>-18.4 dBFS</span></div>
+              <div class="old-stat"><span>链路</span><span>正常</span></div>
+            </div>
+            <div class="old-hr"></div>
+            <div class="old-foot"><span>暂停</span><span>退出</span></div>
+          </div>
+        </div>
+        <figcaption>
+          <strong>现在</strong>
+          刻度点滑杆、蓝色复选框、满宽实心分段、三条全宽分隔线；关键信息（耳机名、状态）用的是最弱的灰色小字；
+          没有任何图标和电平反馈。
+        </figcaption>
+      </figure>
+
+      <figure class="shot">
+        <div class="wall" data-theme="light">
+          <div class="menubar">
+            <div class="mb-item host"><svg viewBox="0 0 16 16" style="color:#0a7aff"><use href="#i-wave"/></svg></div>
+            <div class="mb-item"><svg><use href="#i-bt"/></svg></div>
+            <div class="mb-item"><svg><use href="#i-wifi"/></svg></div>
+            <div class="mb-item"><svg viewBox="0 0 24 16" style="width:20px"><use href="#i-battery"/></svg></div>
+            <span class="mb-clock">周日 14:31</span>
+          </div>
+          <div data-pop="A"></div>
+        </div>
+        <figcaption>
+          <strong>方案</strong>
+          顶部状态区把「通没通 / 什么状态 / 有没有声音」压到一屏；
+          分段控件退成灰底白胶囊；设置和状态各成一张卡片；主按钮和退出分列两端。
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ═══════════ 4 状态矩阵 ═══════════ -->
+  <section class="doc-section">
+    <h2><span class="num">04</span> 状态矩阵</h2>
+    <p class="sub">同一套布局在其余场景下的样子。所有差异都由一个 <code>tone</code>（蓝/橙/红）+ 文案驱动，没有额外分支布局。</p>
+    <div class="shots" id="matrixShots">
+      <figure class="shot">
+        <div class="wall" data-theme="dark">
+          <div class="menubar">
+            <div class="mb-item host"><svg viewBox="0 0 16 16" style="color:#0a84ff"><use href="#i-wave"/></svg></div>
+            <div class="mb-item"><svg><use href="#i-bt"/></svg></div>
+            <div class="mb-item"><svg><use href="#i-wifi"/></svg></div>
+            <span class="mb-clock">周日 14:31</span>
+          </div>
+          <div data-pop="B"></div>
+        </div>
+        <figcaption><strong>深色模式 · 正在播放</strong>
+          卡片改用 5.5% 白色叠加，分隔线 8%。有信号时电平条走满，峰值线跟随。</figcaption>
+      </figure>
+
+      <figure class="shot">
+        <div class="wall" data-theme="light">
+          <div class="menubar">
+            <div class="mb-item host"><svg viewBox="0 0 16 16" style="color:#0a7aff"><use href="#i-wave"/></svg></div>
+            <div class="mb-item"><svg><use href="#i-bt"/></svg></div>
+            <div class="mb-item"><svg><use href="#i-wifi"/></svg></div>
+            <div class="mb-item"><svg viewBox="0 0 24 16" style="width:20px"><use href="#i-battery"/></svg></div>
+            <span class="mb-clock">周日 14:31</span>
+          </div>
+          <div data-pop="C"></div>
+        </div>
+        <figcaption><strong>Mac → Windows 发送模式</strong>
+          缓冲滑杆换成对端地址输入框（与现有逻辑一致），「播放设备」自动变「采集设备」。卡片数量和高度保持不变。</figcaption>
+      </figure>
+
+      <figure class="shot">
+        <div class="wall" data-theme="light">
+          <div class="menubar">
+            <div class="mb-item host"><svg viewBox="0 0 16 16" style="color:#f08a00"><use href="#i-wave"/></svg></div>
+            <div class="mb-item"><svg><use href="#i-bt"/></svg></div>
+            <div class="mb-item"><svg><use href="#i-wifi"/></svg></div>
+            <div class="mb-item"><svg viewBox="0 0 24 16" style="width:20px"><use href="#i-battery"/></svg></div>
+            <span class="mb-clock">周日 14:31</span>
+          </div>
+          <div data-pop="D"></div>
+        </div>
+        <figcaption><strong>已暂停</strong>
+          橙色。电平条置灰归零，数值位显示「—」。主按钮变实心「继续」，是此刻唯一的彩色实体。</figcaption>
+      </figure>
+
+      <figure class="shot">
+        <div class="wall" data-theme="light">
+          <div class="menubar">
+            <div class="mb-item host"><svg viewBox="0 0 16 16" style="color:#e0322a"><use href="#i-wave"/></svg></div>
+            <div class="mb-item"><svg><use href="#i-bt"/></svg></div>
+            <div class="mb-item"><svg><use href="#i-wifi"/></svg></div>
+            <div class="mb-item"><svg viewBox="0 0 24 16" style="width:20px"><use href="#i-battery"/></svg></div>
+            <span class="mb-clock">周日 14:31</span>
+          </div>
+          <div data-pop="E"></div>
+        </div>
+        <figcaption><strong>异常恢复中</strong>
+          红色。<code>errorMessage</code> 非空时才插入错误条，插在状态区下方、方向切换上方；链路行同时转红。</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ═══════════ 5 规格 ═══════════ -->
+  <section class="doc-section">
+    <h2><span class="num">05</span> 视觉规格</h2>
+    <p class="sub">全部数值以 pt 为单位，可直接落进 SwiftUI。</p>
+
+    <div class="grid c2" style="align-items:start">
+      <div>
+        <table class="spec">
+          <tr><th colspan="2">尺寸与间距</th></tr>
+          <tr><td class="k">弹窗宽度</td><td class="v">320（现 300）</td></tr>
+          <tr><td class="k">弹窗内边距</td><td class="v">水平 14 / 垂直 12</td></tr>
+          <tr><td class="k">卡片圆角</td><td class="v">11，<code>.continuous</code></td></tr>
+          <tr><td class="k">卡片间距</td><td class="v">10</td></tr>
+          <tr><td class="k">行高</td><td class="v">最小 40，内边距 8 / 11</td></tr>
+          <tr><td class="k">图标块</td><td class="v">22 × 22，圆角 6，字号 13</td></tr>
+          <tr><td class="k">行内分隔线</td><td class="v">0.5pt，左缩进 43（对齐标题）</td></tr>
+          <tr><td class="k">开关</td><td class="v">30 × 18（<code>.controlSize(.small)</code>）</td></tr>
+          <tr><td class="k">分段控件</td><td class="v">高 24 + 2 内边距，圆角 8 / 6.5</td></tr>
+          <tr><td class="k">电平条</td><td class="v">高 4，圆角 2，峰值线 1.5</td></tr>
+          <tr><td class="k">滑杆</td><td class="v">轨道 3，滑块 13</td></tr>
+          <tr><td class="k">底部按钮</td><td class="v">高 25，胶囊圆角</td></tr>
+        </table>
+      </div>
+      <div>
+        <table class="spec">
+          <tr><th colspan="2">字体与颜色</th></tr>
+          <tr><td class="k">应用名</td><td class="v">13.5 / semibold</td></tr>
+          <tr><td class="k">状态胶囊</td><td class="v">10.5 / bold，高 19，圆角 9.5</td></tr>
+          <tr><td class="k">状态说明</td><td class="v">11.5 / regular / secondary</td></tr>
+          <tr><td class="k">行标题</td><td class="v">12.5 / medium / primary</td></tr>
+          <tr><td class="k">行副标题</td><td class="v">10.5 / regular / tertiary</td></tr>
+          <tr><td class="k">行数值</td><td class="v">12 / medium / secondary，<code>monospacedDigit</code></td></tr>
+          <tr><td class="k">dB 数值</td><td class="v">10.5 / <code>monospaced</code></td></tr>
+          <tr><td class="k">tone = 蓝</td><td class="v"><code>.accentColor</code>，传输中</td></tr>
+          <tr><td class="k">tone = 橙</td><td class="v"><code>.orange</code>，已暂停</td></tr>
+          <tr><td class="k">tone = 红</td><td class="v"><code>.red</code>，异常 / 恢复中</td></tr>
+          <tr><td class="k">卡片填充</td><td class="v">浅色 <code>白 62%</code> / 深色 <code>白 5.5%</code></td></tr>
+          <tr><td class="k">状态区填充</td><td class="v"><code>tone 8%</code> + <code>tone 20%</code> 描边</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="grid c3" style="margin-top:14px">
+      <article class="note">
+        <h3>电平条的映射</h3>
+        <p><code>-60 dBFS → 0%</code>，<code>0 dBFS → 100%</code>，线性夹取。
+          <code>hasSignal == false</code> 时填充置灰、宽度归零，数值位显示「静音」。</p>
+        <p>峰值线保持 1.2 秒后以 24 dB/s 回落，这是它比裸数字更好读的原因。</p>
+      </article>
+      <article class="note">
+        <h3>状态胶囊的取值</h3>
+        <p>只有三种：<strong>传输中</strong>（<code>isPlaying || isSending</code>）、<strong>已暂停</strong>（<code>isPaused</code>）、<strong>异常</strong>（其余）。
+          它和菜单栏图标颜色永远同源，读同一个计算属性。</p>
+        <p>圆点在「传输中」时做 2.1 秒一次的呼吸扩散，其余状态静止。</p>
+      </article>
+      <article class="note">
+        <h3>分段控件不放箭头图标</h3>
+        <p>Windows 的方向按钮带 <code>&#x2191;</code> / <code>&#x2193;</code> 图标，含义是「相对本机的流入流出」。
+          同一个标签在两台机器上箭头方向必然相反，而你是两台一起看的。</p>
+        <p>macOS 这侧的标签本身已经写了 <code>→</code>，再加图标是冗余且会自相矛盾，所以只留文字。</p>
+      </article>
+      <article class="note">
+        <h3>Liquid Glass 可选增强</h3>
+        <p>当前部署目标是 <code>macOS 14.2</code>，上面的效果全部用材质 + 不透明度实现，14 起就能跑。</p>
+        <p>若愿意抬到 <code>macOS 26</code>，可在 <code>#available</code> 分支里给状态区和主按钮加 <code>.glassEffect(.regular.tint(tone))</code>，其余不变。</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- ═══════════ 6 Windows ═══════════ -->
+  <section class="doc-section">
+    <h2><span class="num">06</span> Windows 端微调</h2>
+    <p class="sub">结构、卡片、Mica、文案全部保留。只有三处，目的是让两端在「状态」和「方向」这两个共享概念上长得一致。</p>
+    <div class="shots">
+      <figure class="shot" style="flex:none">
+        <div class="win">
+          <div class="win-bar">
+            <span class="ic"><svg viewBox="0 0 16 16"><use href="#i-wave"/></svg></span>
+            <span>Auvol</span>
+            <span class="tr"><span>—</span><span>▢</span><span>✕</span></span>
+          </div>
+          <div class="win-body">
+            <div class="win-h">连接</div>
+            <div class="win-card">
+              <div class="win-row">
+                <span class="gl"><svg><use href="#i-cable"/></svg></span>
+                <span class="tx"><b>连接状态</b><small>有线 · 169.254.190.152</small></span>
+                <span class="win-pill"><span class="d"></span>传输中</span>
+              </div>
+            </div>
+            <div class="win-h">音频传输</div>
+            <div class="win-card">
+              <div class="win-row">
+                <span class="gl"><svg><use href="#i-transfer"/></svg></span>
+                <span class="tx"><b>传输方向</b></span>
+                <span class="win-selbar">
+                  <span class="on"><svg><use href="#i-up"/></svg>Windows → Mac</span>
+                  <span><svg><use href="#i-down"/></svg>Mac → Windows</span>
+                </span>
+              </div>
+            </div>
+            <div class="win-h">状态</div>
+            <div class="win-card">
+              <div class="win-row">
+                <span class="gl"><svg><use href="#i-speaker"/></svg></span>
+                <span class="tx"><b>信号</b></span>
+                <span class="win-meter" id="winMeter"><i style="width:62%"></i></span>
+                <span style="font-family:var(--mono);font-size:11.5px;color:#444;min-width:56px;text-align:right">−18.4 dB</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <figcaption style="max-width:460px"><strong>Windows · 三处调整后</strong>
+          其余卡片和行保持原样，这里只截取被改动的三行。</figcaption>
+      </figure>
+
+      <div style="flex:1;min-width:320px;display:grid;gap:14px;align-content:start">
+        <article class="note">
+          <h3><span class="badge ac">1</span> 状态点 → 状态胶囊</h3>
+          <p>现在是 <code>Ellipse</code> + 独立 <code>TextBlock</code>，两个元素靠 8pt 间距拼在一起。
+            换成一个带 11% 主题色底的 <code>Border</code>，内部圆点 + 文字，和 macOS 的胶囊一一对应。</p>
+          <p>文件：<code>MainWindow.xaml</code> 的 <code>StateDot</code> / <code>ConnectionStateText</code>。</p>
+        </article>
+        <article class="note">
+          <h3><span class="badge ac">2</span> 信号行加电平条</h3>
+          <p>目前只有一个 <code>SignalValue</code> 文本。在它左边插一个 150px 宽、4px 高的 <code>ProgressBar</code>（或 <code>Rectangle</code> + 宽度绑定），
+            映射规则和 macOS 完全相同（−60…0 dBFS）。这是两端观感差距最大的一处。</p>
+        </article>
+        <article class="note">
+          <h3><span class="badge ac">3</span> 两个 ToggleButton → SelectorBar</h3>
+          <p>现在的 <code>SendModeButton</code> / <code>ReceiveModeButton</code> 是一对手动互斥的 <code>ToggleButton</code>，
+            选中态是完整按钮填充，比 macOS 那侧重。换成 WinUI 3 的 <code>SelectorBar</code>，
+            选中态是下划线，视觉重量和「灰底白胶囊」接近，互斥逻辑也由控件自己管。</p>
+          <p>如果不想动代码逻辑，退而求其次：保留 ToggleButton，仅把选中样式换成 <code>AccentButtonStyle</code> 之外的次级样式。</p>
+        </article>
+        <article class="note">
+          <h3>不改的部分</h3>
+          <p>Mica 背景、<code>TitleBar</code>、三段式分节标题、<code>InfoBar</code>、卡片圆角 8、960px 最大宽度、所有文案，
+            全部维持现状。Windows 的信息密度和留白已经是对的。</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ 7 落地 ═══════════ -->
+  <section class="doc-section">
+    <h2><span class="num">07</span> 落地清单</h2>
+    <p class="sub">按这个顺序做，每一步都能单独编译验证。前四步做完，界面就已经脱胎换骨了。</p>
+    <table class="spec">
+      <tr><th style="width:52px">#</th><th style="width:130px">改动</th><th style="width:260px">文件 / 位置</th><th>说明</th></tr>
+      <tr><td class="k">1</td><td>滑杆去刻度</td><td class="k">StatusView.latencyControl</td>
+        <td class="v">删掉 <code>step: 1</code>，在 setter 里 <code>Int(value.rounded())</code>。视觉收益最大、改动最小。</td></tr>
+      <tr><td class="k">2</td><td>开关样式</td><td class="k">StatusView.autoFollowControl</td>
+        <td class="v">加 <code>.toggleStyle(.switch).controlSize(.small)</code>，并把标题/耳机名改成上下两行的 12.5 / 10.5。</td></tr>
+      <tr><td class="k">3</td><td>卡片容器</td><td class="k">StatusView 新增 <code>SettingsCard</code> / <code>CardRow</code></td>
+        <td class="v">两个私有 <code>View</code>：卡片负责圆角 + 填充 + 描边，行负责图标块 + 标题/副标题 + 尾部控件。删掉全部 <code>Divider()</code>。</td></tr>
+      <tr><td class="k">4</td><td>状态区</td><td class="k">StatusView.header</td>
+        <td class="v">合并现有 <code>header</code> + <code>connection</code>：图标块 + Auvol + 状态胶囊，下面一行 <code>statusMessage</code>。<code>statusColor</code> 升级为共用的 <code>tone</code>。</td></tr>
+      <tr><td class="k">5</td><td>电平条</td><td class="k">StatusView 新增 <code>LevelMeter</code></td>
+        <td class="v">读 <code>signalLevelDBFS</code> / <code>hasSignal</code>，无需引擎改动。峰值保持用一个 <code>@State</code> + 定时衰减。</td></tr>
+      <tr><td class="k">6</td><td>分段控件</td><td class="k">StatusView.roleControl</td>
+        <td class="v">自绘两段胶囊，替换 <code>.pickerStyle(.segmented)</code>；仍然调 <code>engine.selectRole</code>，方向语义不变。</td></tr>
+      <tr><td class="k">7</td><td>底部按钮</td><td class="k">StatusView.footer</td>
+        <td class="v">「退出」左置、<code>.plain</code> + tertiary；「暂停 / 继续」右置、胶囊主按钮，带 <code>pause.fill</code> / <code>play.fill</code>。</td></tr>
+      <tr><td class="k">8</td><td>错误条</td><td class="k">StatusView 新增 <code>errorBanner</code></td>
+        <td class="v">把 <code>errorMessage</code> 从连接块里拆出来，做成红色圆角条，只在非空时出现。</td></tr>
+      <tr><td class="k">9</td><td>宽度</td><td class="k">StatusView.body</td>
+        <td class="v"><code>.frame(width: 320)</code>，内边距改 14 / 12。</td></tr>
+      <tr><td class="k">10</td><td>Windows 三处</td><td class="k">windows/winui/MainWindow.xaml</td>
+        <td class="v">状态胶囊、信号电平条、SelectorBar。<code>.xaml.cpp</code> 只需跟着改 SelectorBar 的选中事件。</td></tr>
+    </table>
+    <p class="sub" style="margin-top:16px">
+      1 – 9 全在 <code>StatusView.swift</code> 内，不碰 <code>ReceiverEngine</code>，没有协议变更，
+      所以 Mac 侧可以单独编译验证；第 10 步涉及 Windows，按 <code>AGENT.md</code> 需要先确认 SSH 连通再动，
+      并且改完要跑 <code>./deploy.sh</code> 双端部署。
+    </p>
+  </section>
+
+</div>
+
+<script>
+(function () {
+  const ICON = (id, cls) => `<svg${cls ? ` class="${cls}"` : ""} viewBox="0 0 16 16"><use href="#${id}"/></svg>`;
+
+  const STATES = {
+    A: {
+      theme: "light", tone: "blue", live: true, role: "receive",
+      pill: "传输中", status: "正在播放 Windows 音频",
+      level: -18.4, muted: false,
+      autoFollow: true, headphone: "WF-1000XM5",
+      buffer: 12, device: "MacBook Air 扬声器",
+      link: "有线 · 正常", ip: "169.254.190.152",
+      running: true
+    },
+    B: {
+      theme: "dark", tone: "blue", live: true, role: "receive",
+      pill: "传输中", status: "正在播放 Windows 音频",
+      level: -12.6, muted: false,
+      autoFollow: true, headphone: "WF-1000XM5",
+      buffer: 24, device: "WF-1000XM5",
+      link: "有线 · 正常", ip: "169.254.190.152",
+      running: true
+    },
+    C: {
+      theme: "light", tone: "blue", live: true, role: "send",
+      pill: "传输中", status: "正在向 Windows 发送",
+      level: -22.8, muted: false,
+      autoFollow: false, headphone: "未启用",
+      peer: "192.168.101.170", device: "MacBook Air 扬声器",
+      link: "Wi-Fi · 正常", ip: "192.168.101.170",
+      running: true
+    },
+    D: {
+      theme: "light", tone: "orange", live: false, role: "receive",
+      pill: "已暂停", status: "已暂停",
+      level: null, muted: true,
+      autoFollow: true, headphone: "WF-1000XM5",
+      buffer: 12, device: "MacBook Air 扬声器",
+      link: "—", ip: "169.254.190.152",
+      running: false
+    },
+    E: {
+      theme: "light", tone: "red", live: false, role: "receive",
+      pill: "异常", status: "正在恢复 · 网络路径已切换",
+      level: null, muted: true,
+      error: "UDP 发送失败，正在重建链路",
+      autoFollow: true, headphone: "WF-1000XM5",
+      buffer: 12, device: "MacBook Air 扬声器",
+      link: "丢包 42 · 欠载", linkBad: true, ip: "169.254.190.152",
+      running: true
+    }
+  };
+
+  function build(s) {
+    const el = document.createElement("div");
+    el.className = "pop";
+    el.dataset.theme = s.theme;
+    el.dataset.tone = s.tone;
+    el.dataset.live = s.live ? "1" : "0";
+
+    const recv = s.role === "receive";
+
+    el.innerHTML = `
+      <div class="hero">
+        <div class="hero-top">
+          <span class="app-tile">${ICON("i-wave")}</span>
+          <span class="wordmark">Auvol</span>
+          <span class="pill"><span class="dot"></span>${s.pill}</span>
+        </div>
+        <div class="hero-status">${s.status}</div>
+        <div class="meter-row">
+          <span class="meter${s.muted ? " muted" : ""}">
+            <span class="fill" style="width:${s.muted ? 0 : pct(s.level)}%"></span>
+            ${s.muted ? "" : `<span class="peak" style="left:${pct(s.level)}%"></span>`}
+          </span>
+          <span class="meter-val">${s.muted ? (s.tone === "blue" ? "静音" : "—") : fmt(s.level)}</span>
+        </div>
+      </div>
+
+      ${s.error ? `<div class="err">${ICON("i-warn")}<span>${s.error}</span></div>` : ""}
+
+      <div class="seg" role="tablist">
+        <button type="button" class="${recv ? "on" : ""}">Windows → Mac</button>
+        <button type="button" class="${recv ? "" : "on"}">Mac → Windows</button>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <span class="tile${s.autoFollow ? " tinted" : ""}">${ICON("i-headphones")}</span>
+          <span class="row-text">
+            <span class="row-title">自动跟随耳机</span>
+            <span class="row-sub">${s.headphone}</span>
+          </span>
+          <button type="button" class="sw${s.autoFollow ? " on" : ""}" aria-label="自动跟随耳机"></button>
+        </div>
+        ${recv ? `
+        <div class="row stack">
+          <span style="display:flex;align-items:center;gap:10px">
+            <span class="tile">${ICON("i-timer")}</span>
+            <span class="row-text"><span class="row-title">缓冲目标</span></span>
+            <span class="row-val mono buf">${s.buffer} ms</span>
+          </span>
+          <span style="padding-left:32px">
+            <span class="slider">
+              <span class="strack"></span>
+              <span class="sfill" style="width:${sp(s.buffer)}%"></span>
+              <span class="sknob" style="left:${sp(s.buffer)}%"></span>
+              <input type="range" min="8" max="80" step="1" value="${s.buffer}" />
+            </span>
+            <span class="scale"><span>8 ms · 最低延迟</span><span>80 ms · 最稳</span></span>
+          </span>
+        </div>` : `
+        <div class="row">
+          <span class="tile">${ICON("i-globe")}</span>
+          <span class="row-text"><span class="row-title">Windows 地址</span></span>
+          <input class="field" value="${s.peer}" spellcheck="false" />
+        </div>`}
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <span class="tile">${ICON("i-speaker")}</span>
+          <span class="row-text"><span class="row-title">${recv ? "播放设备" : "采集设备"}</span></span>
+          <span class="row-val">${s.device}</span>
+        </div>
+        <div class="row">
+          <span class="tile">${ICON("i-cable")}</span>
+          <span class="row-text">
+            <span class="row-title">链路</span>
+            <span class="row-sub">${s.ip}</span>
+          </span>
+          <span class="row-val ${s.linkBad ? "warn" : "good"}">${s.link}</span>
+        </div>
+      </div>
+
+      <div class="foot">
+        <button type="button" class="btn ghost">退出</button>
+        <button type="button" class="btn ${s.running ? "secondary" : "primary"} toggle-run">
+          ${ICON(s.running ? "i-pause" : "i-play")}${s.running ? "暂停" : "继续"}
+        </button>
+      </div>
+    `;
+
+    wire(el, s);
+    return el;
+  }
+
+  const pct = db => Math.max(0, Math.min(100, ((db + 60) / 60) * 100));
+  const sp  = ms => ((ms - 8) / 72) * 100;
+  const fmt = db => `${db < 0 ? "−" : ""}${Math.abs(db).toFixed(1)} dB`;
+
+  function wire(el, s) {
+    el.querySelectorAll(".seg button").forEach((b, i) => {
+      b.addEventListener("click", () => {
+        el.querySelectorAll(".seg button").forEach(x => x.classList.remove("on"));
+        b.classList.add("on");
+        const recv = i === 0;
+        const t = el.querySelector(".hero-status");
+        if (s.tone === "blue") t.textContent = recv ? "正在播放 Windows 音频" : "正在向 Windows 发送";
+        const devLabel = el.querySelectorAll(".card")[1].querySelector(".row-title");
+        devLabel.textContent = recv ? "播放设备" : "采集设备";
+      });
+    });
+
+    const sw = el.querySelector(".sw");
+    sw.addEventListener("click", () => {
+      sw.classList.toggle("on");
+      const on = sw.classList.contains("on");
+      sw.closest(".row").querySelector(".tile").classList.toggle("tinted", on);
+      sw.closest(".row").querySelector(".row-sub").textContent = on ? (s.headphone === "未启用" ? "等待耳机成为默认输出" : s.headphone) : "未启用";
+    });
+
+    const range = el.querySelector(".slider input");
+    if (range) {
+      const fill = el.querySelector(".sfill"), knob = el.querySelector(".sknob"), lab = el.querySelector(".buf");
+      range.addEventListener("input", () => {
+        const v = +range.value;
+        fill.style.width = sp(v) + "%";
+        knob.style.left = sp(v) + "%";
+        lab.textContent = v + " ms";
+      });
+    }
+
+    const run = el.querySelector(".toggle-run");
+    run.addEventListener("click", () => {
+      s.running = !s.running;
+      run.className = `btn ${s.running ? "secondary" : "primary"} toggle-run`;
+      run.innerHTML = `${ICON(s.running ? "i-pause" : "i-play")}${s.running ? "暂停" : "继续"}`;
+      el.dataset.tone = s.running ? s.tone : "orange";
+      el.dataset.live = s.running && s.live ? "1" : "0";
+      el.querySelector(".pill").innerHTML = `<span class="dot"></span>${s.running ? s.pill : "已暂停"}`;
+      el.querySelector(".hero-status").textContent = s.running ? s.status : "已暂停";
+      s.muted = !s.running || s.muted;
+      el.querySelector(".meter").classList.toggle("muted", !s.running);
+    });
+
+    // animated meter
+    if (!s.muted) {
+      const fill = el.querySelector(".meter .fill");
+      const peak = el.querySelector(".meter .peak");
+      const val  = el.querySelector(".meter-val");
+      let cur = s.level, pk = s.level, pkAt = 0;
+      setInterval(() => {
+        if (!s.running) { fill.style.width = "0%"; val.textContent = "—"; return; }
+        const t = Date.now();
+        cur += (Math.random() - 0.5) * 7;
+        cur = Math.max(-46, Math.min(-4, cur * 0.82 + s.level * 0.18));
+        if (cur > pk) { pk = cur; pkAt = t; }
+        else if (t - pkAt > 1200) pk = Math.max(cur, pk - 0.55);
+        fill.style.width = pct(cur) + "%";
+        peak.style.left = pct(pk) + "%";
+        val.textContent = fmt(cur);
+      }, 90);
+    }
+  }
+
+  document.querySelectorAll("[data-pop]").forEach(slot => {
+    slot.replaceWith(build(STATES[slot.dataset.pop]));
+  });
+
+  // windows meter
+  const wm = document.querySelector("#winMeter i");
+  if (wm) {
+    let c = -18.4;
+    setInterval(() => {
+      c += (Math.random() - 0.5) * 7;
+      c = Math.max(-46, Math.min(-4, c * 0.82 - 18.4 * 0.18));
+      wm.style.width = pct(c) + "%";
+    }, 90);
+  }
+
+  // zoom
+  const seg = document.getElementById("zoomSeg");
+  seg.addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    seg.querySelectorAll("button").forEach(x => x.classList.remove("active"));
+    b.classList.add("active");
+    document.querySelectorAll("#compareShots .wall, #matrixShots .wall")
+      .forEach(w => { w.style.zoom = b.dataset.zoom; });
+  });
+})();
+</script>
+</body>
+</html>
