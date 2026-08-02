@@ -328,6 +328,14 @@ namespace winrt::Auvol::implementation
     {
         std::string clean = text;
         if (clean.rfind("Status: ", 0) == 0) clean.erase(0, 8);
+        if (clean.rfind("Using wired Ethernet", 0) == 0) {
+            ConnectionPathText().Text(L"有线");
+            return;
+        }
+        if (clean.rfind("Using fallback network", 0) == 0) {
+            ConnectionPathText().Text(L"Wi-Fi");
+            return;
+        }
         const bool idle = clean == "Idle";
         const bool error = clean.find("Cannot") != std::string::npos ||
                            clean.find("failed") != std::string::npos ||

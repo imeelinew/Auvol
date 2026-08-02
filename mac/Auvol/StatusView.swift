@@ -101,7 +101,7 @@ struct StatusView: View {
 
     private var connectionDetail: String {
         let path = engine.networkPathName == NetworkPathKind.wired.title
-            ? "有线" : "备用网络"
+            ? "有线" : "Wi-Fi"
         if engine.role == .receive && !engine.senderIP.isEmpty {
             return "\(engine.senderIP) · \(path)"
         }

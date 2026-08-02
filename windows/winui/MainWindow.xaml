@@ -156,6 +156,10 @@
                                         Spacing="2">
                                 <TextBlock Text="连接状态"
                                            Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                                <TextBlock x:Name="ConnectionPathText"
+                                           Text="—"
+                                           Style="{ThemeResource CaptionTextBlockStyle}"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                             </StackPanel>
                             <StackPanel Grid.Column="2"
                                         Orientation="Horizontal"

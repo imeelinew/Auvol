@@ -699,7 +699,7 @@
         <div class="tag">优化原则</div>
         <h2>统一信息，而不是统一控件外形</h2>
         <ul>
-          <li><span class="unify">相通字段：</span>方向、连接状态、自动跟随耳机、播放/采集设备、信号、链路质量、网络路径（Mac）。</li>
+          <li><span class="unify">相通字段：</span>方向、连接状态、自动跟随耳机、播放/采集设备、信号、链路质量、<strong>网络路径（有线 / Wi-Fi）</strong>。</li>
           <li><span class="keep">保留控制：</span>对端 IP、方向切换、开始/停止（Win）或暂停/退出（Mac）、缓冲目标滑杆（仅 Mac 接收）。</li>
           <li><span class="drop">默认隐藏：</span>当前缓冲、输出/源周期、时钟校正、数据包速率、丢失/迟到、欠载、溢出、采集异常、原始统计串，以及 <strong>ALV2 · 采样率 · 声道</strong>。</li>
           <li><span class="drop">删废话：</span>去掉各行说明性副标题；菜单栏去掉旧的箭头+波形+色点组合图标。</li>
@@ -725,7 +725,8 @@
     <div class="toolbar">
       <label>预览场景</label>
       <div class="seg" id="sceneSeg">
-        <button type="button" class="active" data-scene="receive">Windows → Mac</button>
+        <button type="button" class="active" data-scene="receive">Windows → Mac · 有线</button>
+        <button type="button" data-scene="wifi">Windows → Mac · Wi-Fi</button>
         <button type="button" data-scene="send">Mac → Windows</button>
         <button type="button" data-scene="idle">已暂停</button>
         <button type="button" data-scene="error">有问题</button>
@@ -783,6 +784,7 @@
                 </div>
                 <div>
                   <div class="win-row-title">连接状态</div>
+                  <div class="win-row-sub" id="winPath">有线</div>
                 </div>
                 <div style="font-size:14px;font-weight:600">
                   <span class="win-status-dot" id="winDot"></span><span id="winConn">运行中</span>
@@ -957,9 +959,15 @@
           </tr>
           <tr>
             <td>连接 / 传输状态</td>
-            <td>连接状态 + InfoBar 短句</td>
+            <td>连接状态 + 路径副文案（有线 / Wi-Fi）+ InfoBar</td>
             <td>状态点 + 一行状态；菜单栏 <code>wave.3.forward</code> 上色</td>
-            <td><span class="badge on">保留</span> 图标改为三态色</td>
+            <td><span class="badge opt">Win 补路径</span></td>
+          </tr>
+          <tr>
+            <td>网络路径</td>
+            <td>放在「连接状态」下方：有线 / Wi-Fi</td>
+            <td>与对端 IP 同行：<code>IP · 有线</code> / <code>IP · Wi-Fi</code></td>
+            <td><span class="badge opt">文案对齐</span> 不用「备用网络」</td>
           </tr>
           <tr>
             <td>缓冲目标</td>
@@ -995,6 +1003,7 @@
       receive: {
         winConn: "运行中",
         winDot: "#6ccb5f",
+        winPath: "有线",
         winTransport: "停止传输",
         winTransportStop: true,
         winInfoTitle: "已连接",
@@ -1019,9 +1028,38 @@
         showBuffer: true,
         dir: "receive",
       },
+      wifi: {
+        winConn: "运行中",
+        winDot: "#6ccb5f",
+        winPath: "Wi-Fi",
+        winTransport: "停止传输",
+        winTransportStop: true,
+        winInfoTitle: "已连接",
+        winInfoMsg: "正在向 Mac 发送 Windows 音频",
+        winInfoBg: "rgba(15,123,58,.18)",
+        winInfoBorder: "rgba(108,203,95,.28)",
+        winDeviceKey: "采集设备",
+        winDevice: "扬声器 (Realtek)",
+        winSignal: "-18.4 dBFS",
+        winQuality: "正常",
+        winFollow: "WF-1000XM5",
+        macStatus: "已连接 · 传入音频静音",
+        macPeer: "192.168.101.170 · Wi-Fi",
+        macDeviceKey: "播放设备",
+        macDevice: "WF-1000XM5",
+        macSignal: "静音",
+        macQuality: "正常",
+        macQualityClass: "good",
+        macDot: "#0a84ff",
+        macIcon: "#0a84ff",
+        macPause: "暂停",
+        showBuffer: true,
+        dir: "receive",
+      },
       send: {
         winConn: "运行中",
         winDot: "#6ccb5f",
+        winPath: "有线",
         winTransport: "停止传输",
         winTransportStop: true,
         winInfoTitle: "已连接",
@@ -1049,6 +1087,7 @@
       idle: {
         winConn: "空闲",
         winDot: "rgba(255,255,255,.35)",
+        winPath: "—",
         winTransport: "开始传输",
         winTransportStop: false,
         winInfoTitle: "已暂停",
@@ -1076,6 +1115,7 @@
       error: {
         winConn: "需要处理",
         winDot: "#ff453a",
+        winPath: "Wi-Fi",
         winTransport: "停止传输",
         winTransportStop: true,
         winInfoTitle: "传输错误",
@@ -1105,6 +1145,7 @@
     function applyScene(name) {
       const s = scenes[name];
       document.getElementById("winConn").textContent = s.winConn;
+      document.getElementById("winPath").textContent = s.winPath;
       document.getElementById("winDot").style.background = s.winDot;
       document.getElementById("winDot").style.boxShadow =
         name === "idle" || name === "error" ? "none" : "0 0 0 3px rgba(108,203,95,.18)";
