@@ -19,12 +19,15 @@ final class AudioSender {
     var isRunning: Bool { handle != nil }
 
     @discardableResult
-    func start(targetIP: String, port: UInt16) -> String? {
+    func start(targetIP: String, localIP: String?, port: UInt16) -> String? {
         stop()
         var error = [CChar](repeating: 0, count: 256)
-        let newHandle = targetIP.withCString {
-            auvol_system_audio_sender_start($0, port, &error,
-                                            UInt32(error.count))
+        let localAddress = localIP ?? ""
+        let newHandle = targetIP.withCString { target in
+            localAddress.withCString { local in
+                auvol_system_audio_sender_start(target, local, port, &error,
+                                                UInt32(error.count))
+            }
         }
         guard let newHandle else {
             return String(cString: error)

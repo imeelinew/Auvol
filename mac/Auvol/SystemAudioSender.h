@@ -19,6 +19,7 @@ typedef struct AuvolSystemAudioSenderStats {
 
 AuvolSystemAudioSender *auvol_system_audio_sender_start(
     const char *targetIP,
+    const char *localIP,
     uint16_t port,
     char *errorText,
     uint32_t errorTextCapacity

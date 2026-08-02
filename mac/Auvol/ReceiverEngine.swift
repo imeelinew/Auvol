@@ -57,6 +57,7 @@ final class ReceiverEngine: ObservableObject {
     @Published private(set) var followedOutputName = ""
     @Published private(set) var currentSystemOutputName = ""
     @Published private(set) var currentSystemOutputIsBluetooth = false
+    @Published private(set) var networkPathName = NetworkPathKind.fallback.title
 
     private let logger = Logger(subsystem: "com.eli.Auvol", category: "stream")
     private let metricsLock = NSLock()
@@ -64,6 +65,7 @@ final class ReceiverEngine: ObservableObject {
     private let player = AudioPlayer()
     private let sender = AudioSender()
     private let outputRouteMonitor = AudioOutputRouteMonitor()
+    private let networkPathMonitor: NetworkPathMonitor
     private var directionControl: DirectionControlChannel?
     private var network: NetworkReceiver?
     private var statsTimer: Timer?
@@ -90,6 +92,8 @@ final class ReceiverEngine: ObservableObject {
     private var lastSignalTime: Date?
     private var currentOutputRoute: AudioOutputRoute?
     private var followedOutputUID = ""
+    private var activePeerIP = ""
+    private var activeLocalIP: String?
 
     private var previousPacketCount: UInt64 = 0
     private var previousUnderrunFrames: UInt64 = 0
@@ -115,7 +119,13 @@ final class ReceiverEngine: ObservableObject {
 
         let saved = UserDefaults.standard.object(forKey: Self.targetBufferKey) as? Int
         targetBufferMs = min(80, max(8, saved ?? Self.defaultTargetBufferMs))
-        peerIP = initialPeerIP ?? UserDefaults.standard.string(forKey: Self.peerIPKey) ?? peerIP
+        let savedPeerIP = initialPeerIP ??
+            UserDefaults.standard.string(forKey: Self.peerIPKey) ??
+            "192.168.101.170"
+        peerIP = savedPeerIP
+        activePeerIP = savedPeerIP
+        activeLocalIP = nil
+        networkPathMonitor = NetworkPathMonitor(fallbackPeerIP: savedPeerIP)
         autoFollowEnabled = UserDefaults.standard.bool(forKey: Self.autoFollowKey)
         followedOutputUID = UserDefaults.standard.string(
             forKey: Self.followedOutputUIDKey
@@ -136,6 +146,12 @@ final class ReceiverEngine: ObservableObject {
             logger.warning("direction control unavailable: \(error, privacy: .public)")
         }
         directionControl = control
+        networkPathMonitor.onSelection = { [weak self] selection in
+            DispatchQueue.main.async { [weak self] in
+                self?.applyNetworkPath(selection)
+            }
+        }
+        networkPathMonitor.start()
         outputRouteMonitor.onStableRoute = { [weak self] route in
             self?.handleStableOutputRoute(route)
         }
@@ -231,9 +247,15 @@ final class ReceiverEngine: ObservableObject {
     func setPeerIP(_ value: String) {
         peerIP = value
         UserDefaults.standard.set(value, forKey: Self.peerIPKey)
-        directionControl?.setPeerIP(value)
+        networkPathMonitor.setFallbackPeerIP(value)
+        if activeLocalIP == nil {
+            activePeerIP = value
+            directionControl?.setPeerIP(value)
+        } else {
+            directionControl?.setPeerIP(activePeerIP)
+        }
         peerChangeWorkItem?.cancel()
-        guard role == .send, !isPaused else { return }
+        guard role == .send, !isPaused, activeLocalIP == nil else { return }
         let generation = currentGeneration()
         let item = DispatchWorkItem { [weak self] in
             self?.beginRecovery("Destination changed", expectedGeneration: generation)
@@ -368,7 +390,9 @@ final class ReceiverEngine: ObservableObject {
     }
 
     private func startSender(generation: UInt64) {
-        guard let error = sender.start(targetIP: peerIP, port: port) else {
+        guard let error = sender.start(targetIP: activePeerIP,
+                                       localIP: activeLocalIP,
+                                       port: port) else {
             guard isCurrent(generation, role: .send) else {
                 sender.stop()
                 return
@@ -377,7 +401,7 @@ final class ReceiverEngine: ObservableObject {
             transportRecovering = false
             publishRecoveryState(playerRecovering: false)
             statusMessage = "Starting system-audio capture"
-            logger.notice("sender generation=\(generation) to \(self.peerIP, privacy: .public):\(self.port)")
+            logger.notice("sender generation=\(generation) to \(self.activePeerIP, privacy: .public):\(self.port) path=\(self.networkPathName, privacy: .public) local=\(self.activeLocalIP ?? "auto", privacy: .public)")
             return
         }
         beginRecovery(error, expectedGeneration: generation)
@@ -432,6 +456,25 @@ final class ReceiverEngine: ObservableObject {
         isListening = false
         isPlaying = false
         isSending = false
+    }
+
+    private func applyNetworkPath(_ selection: NetworkPathSelection) {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.applyNetworkPath(selection)
+            }
+            return
+        }
+        let changed = activePeerIP != selection.peerIP ||
+            activeLocalIP != selection.localIP ||
+            networkPathName != selection.kind.title
+        activePeerIP = selection.peerIP
+        activeLocalIP = selection.localIP
+        networkPathName = selection.kind.title
+        directionControl?.setLocalIP(selection.localIP)
+        directionControl?.setPeerIP(activePeerIP)
+        guard changed, role == .send, !isPaused else { return }
+        beginRecovery("Network path changed", expectedGeneration: currentGeneration())
     }
 
     private func setDesiredState(role: TransportRole, paused: Bool) -> UInt64 {
@@ -786,6 +829,7 @@ final class ReceiverEngine: ObservableObject {
         peerChangeWorkItem?.cancel()
         statsTimer?.invalidate()
         directionControl?.stop()
+        networkPathMonitor.stop()
         outputRouteMonitor.stop()
         network?.stop()
         player.stop()

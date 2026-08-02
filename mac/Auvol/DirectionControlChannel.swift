@@ -40,6 +40,7 @@ final class DirectionControlChannel {
     private var socketFD: Int32 = -1
     private var readSource: DispatchSourceRead?
     private var peerIP: String
+    private var localIP: String?
     private let deviceID: UInt64
     private var clock: UInt64
     private var winner: DirectionState
@@ -51,6 +52,7 @@ final class DirectionControlChannel {
 
     init(peerIP: String, initialDirection: SynchronizedDirection) {
         self.peerIP = peerIP
+        self.localIP = nil
         let defaults = UserDefaults.standard
         let savedDeviceID = Self.readUInt64(Self.deviceIDKey, from: defaults)
         let generatedDeviceID = UInt64.random(in: 1...UInt64.max)
@@ -78,7 +80,14 @@ final class DirectionControlChannel {
         var address = sockaddr_in()
         address.sin_family = sa_family_t(AF_INET)
         address.sin_port = Self.controlPort.bigEndian
-        address.sin_addr = in_addr(s_addr: INADDR_ANY)
+        if let localIP,
+           inet_pton(AF_INET, localIP, &address.sin_addr) != 1 {
+            close(fd)
+            return "Invalid local network address"
+        }
+        if localIP == nil {
+            address.sin_addr = in_addr(s_addr: INADDR_ANY)
+        }
         let result = withUnsafePointer(to: &address) { pointer -> Int32 in
             pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
                 bind(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
@@ -121,6 +130,63 @@ final class DirectionControlChannel {
 
     func setPeerIP(_ value: String) {
         queue.async { [weak self] in self?.peerIP = value }
+    }
+
+    func setLocalIP(_ value: String?) {
+        queue.async { [weak self] in self?.rebind(localIP: value) }
+    }
+
+    private func rebind(localIP: String?) {
+        guard self.localIP != localIP else { return }
+        self.localIP = localIP
+        guard socketFD >= 0 else { return }
+
+        readSource?.cancel()
+        readSource = nil
+        close(socketFD)
+        socketFD = -1
+
+        var fd = makeSocket(localIP: localIP)
+        if fd == nil, localIP != nil {
+            self.localIP = nil
+            fd = makeSocket(localIP: nil)
+        }
+        guard let fd else { return }
+        let flags = fcntl(fd, F_GETFL)
+        _ = fcntl(fd, F_SETFL, flags | O_NONBLOCK)
+        socketFD = fd
+        let source = DispatchSource.makeReadSource(fileDescriptor: fd, queue: queue)
+        source.setEventHandler { [weak self] in self?.drainIncoming() }
+        readSource = source
+        source.resume()
+    }
+
+    private func makeSocket(localIP: String?) -> Int32? {
+        let fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
+        guard fd >= 0 else { return nil }
+        var address = sockaddr_in()
+        address.sin_family = sa_family_t(AF_INET)
+        address.sin_port = Self.controlPort.bigEndian
+        if let localIP {
+            guard inet_pton(AF_INET, localIP, &address.sin_addr) == 1 else {
+                close(fd)
+                return nil
+            }
+        } else {
+            address.sin_addr = in_addr(s_addr: INADDR_ANY)
+        }
+        let result = withUnsafePointer(to: &address) { pointer -> Int32 in
+            pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                bind(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+            }
+        }
+        guard result == 0 else {
+            close(fd)
+            return nil
+        }
+        let flags = fcntl(fd, F_GETFL)
+        _ = fcntl(fd, F_SETFL, flags | O_NONBLOCK)
+        return fd
     }
 
     func publish(_ direction: SynchronizedDirection) {

@@ -13,6 +13,7 @@
 
 #include "resource.h"
 #include "AuvolCore.h"
+#include "NetworkPathManager.h"
 
 #include <array>
 #include <algorithm>
@@ -101,6 +102,12 @@ static std::atomic<UINT64> g_autoFollowGeneration{0};
 static std::atomic<bool> g_autoMonitorRunning{false};
 static HANDLE g_autoMonitorEvent = nullptr;
 static std::thread g_autoMonitorThread;
+static auvol::NetworkPathManager g_networkPath;
+static std::mutex g_transportEndpointMutex;
+static std::string g_configuredPeerIP;
+static std::string g_activePeerIP;
+static std::string g_activeLocalIP;
+static bool g_activeWired = false;
 
 static void PersistAutoFollowSettings();
 
@@ -455,6 +462,49 @@ static std::thread g_directionThread;
 
 static void ApplySynchronizedMode(int mode);
 
+struct TransportEndpoint {
+    std::string peerIP;
+    std::string localIP;
+};
+
+static TransportEndpoint CurrentTransportEndpoint() {
+    std::lock_guard<std::mutex> lock(g_transportEndpointMutex);
+    const std::string peer = !g_activePeerIP.empty()
+        ? g_activePeerIP
+        : (!g_configuredPeerIP.empty() ? g_configuredPeerIP : g_savedIP);
+    return {peer, g_activeWired ? g_activeLocalIP : std::string()};
+}
+
+static void ApplyNetworkPath(auvol::NetworkPathSelection selection) {
+    if (selection.peerIP.empty()) return;
+
+    bool changed = false;
+    {
+        std::lock_guard<std::mutex> lock(g_transportEndpointMutex);
+        changed = g_activePeerIP != selection.peerIP ||
+                  g_activeLocalIP != selection.localIP ||
+                  g_activeWired != selection.wired;
+        g_activePeerIP = selection.peerIP;
+        g_activeLocalIP = selection.localIP;
+        g_activeWired = selection.wired;
+    }
+    {
+        std::lock_guard<std::mutex> lock(g_directionMutex);
+        g_directionPeerIP = selection.peerIP;
+    }
+    if (!changed) return;
+
+    char status[192] = {};
+    snprintf(status, sizeof(status), "%s (%s)",
+             selection.wired ? "Using wired Ethernet" : "Using fallback network",
+             selection.peerIP.c_str());
+    PostStatus(status);
+    if (g_running.load(std::memory_order_acquire)) {
+        g_controlGeneration.fetch_add(1, std::memory_order_acq_rel);
+        if (g_controlEvent) SetEvent(g_controlEvent);
+    }
+}
+
 static UINT64 GenerateDirectionDeviceID() {
     GUID guid = {};
     UINT64 first = 0;
@@ -805,7 +855,8 @@ public:
         }
     }
 
-    bool open(const std::string& targetIP, UINT16 port) {
+    bool open(const std::string& targetIP, const std::string& localIP,
+              UINT16 port) {
         socket_ = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
         if (socket_ == INVALID_SOCKET) {
             return false;
@@ -823,8 +874,20 @@ public:
         destination_ = {};
         destination_.sin_family = AF_INET;
         destination_.sin_port = htons(port);
-        return inet_pton(AF_INET, targetIP.c_str(),
-                         &destination_.sin_addr) == 1;
+        if (inet_pton(AF_INET, targetIP.c_str(), &destination_.sin_addr) != 1) {
+            return false;
+        }
+        if (!localIP.empty()) {
+            sockaddr_in local = {};
+            local.sin_family = AF_INET;
+            local.sin_port = 0;
+            if (inet_pton(AF_INET, localIP.c_str(), &local.sin_addr) != 1 ||
+                bind(socket_, reinterpret_cast<const sockaddr*>(&local),
+                     sizeof(local)) != 0) {
+                return false;
+            }
+        }
+        return true;
     }
 
     bool sendConfig(UINT32 streamID,
@@ -1379,7 +1442,8 @@ private:
         std::chrono::steady_clock::now();
 };
 
-static void AudioThread(std::string targetIP, UINT16 port, UINT64 generation) {
+static void AudioThread(std::string targetIP, std::string localIP,
+                        UINT16 port, UINT64 generation) {
     WSADATA winsock = {};
     IMMDeviceEnumerator* enumerator = nullptr;
     IMMDevice* device = nullptr;
@@ -1431,7 +1495,7 @@ static void AudioThread(std::string targetIP, UINT16 port, UINT64 generation) {
     }
     winsockInitialized = true;
 
-    if (!sender.open(targetIP, port)) {
+    if (!sender.open(targetIP, localIP, port)) {
         PostStatus("Invalid destination or UDP socket failure");
         finish();
         return;
@@ -1863,17 +1927,18 @@ static void ReceiverThread(std::string ignoredTargetIP, UINT16 port,
     WSACleanup();
 }
 
-static void SupervisorThread(std::string targetIP, UINT16 port) {
+static void SupervisorThread(UINT16 port) {
     unsigned retryAttempt = 0;
     while (g_running.load(std::memory_order_acquire)) {
         const UINT64 generation =
             g_controlGeneration.load(std::memory_order_acquire);
         const int mode = g_desiredMode.load(std::memory_order_acquire);
+        const auto endpoint = CurrentTransportEndpoint();
         const auto started = std::chrono::steady_clock::now();
         if (mode == 1) {
-            ReceiverThread(targetIP, port, generation);
+            ReceiverThread(endpoint.peerIP, port, generation);
         } else {
-            AudioThread(targetIP, port, generation);
+            AudioThread(endpoint.peerIP, endpoint.localIP, port, generation);
         }
         if (!g_running.load(std::memory_order_acquire)) break;
 
@@ -2209,12 +2274,25 @@ std::string CommandLinePeer(int* mode) {
 }
 
 void SetDirectionControlPeer(const std::string& peerIP) {
-    std::lock_guard<std::mutex> lock(g_directionMutex);
-    g_directionPeerIP = peerIP;
+    {
+        std::lock_guard<std::mutex> lock(g_directionMutex);
+        g_directionPeerIP = peerIP;
+    }
+    {
+        std::lock_guard<std::mutex> endpointLock(g_transportEndpointMutex);
+        g_configuredPeerIP = peerIP;
+        if (!g_activeWired) {
+            g_activePeerIP = peerIP;
+            g_activeLocalIP.clear();
+        }
+    }
+    g_networkPath.setFallbackPeerIP(peerIP);
 }
 
 void StartDirectionControl(const std::string& peerIP) {
     SetDirectionControlPeer(peerIP);
+    g_networkPath.setCallback(ApplyNetworkPath);
+    g_networkPath.start(peerIP);
     if (g_directionControlRunning.exchange(true, std::memory_order_acq_rel)) {
         return;
     }
@@ -2283,7 +2361,7 @@ bool Start(const std::string& peerIP, int mode) {
     g_running.store(true, std::memory_order_release);
     g_connected.store(true, std::memory_order_release);
     ResetEvent(g_controlEvent);
-    g_audioThread = std::thread(SupervisorThread, peerIP,
+    g_audioThread = std::thread(SupervisorThread,
                                 static_cast<UINT16>(7777));
     SaveSettings(peerIP, mode, true);
     NotifyRunning(true);
@@ -2322,6 +2400,7 @@ bool IsRunning() {
 
 void Shutdown() {
     Stop();
+    g_networkPath.stop();
     g_autoMonitorRunning.store(false, std::memory_order_release);
     if (g_autoMonitorEvent) SetEvent(g_autoMonitorEvent);
     if (g_autoMonitorThread.joinable()) g_autoMonitorThread.join();
@@ -2423,7 +2502,7 @@ static LRESULT CALLBACK WindowProcedure(HWND window,
             g_connected.store(true, std::memory_order_release);
             SetConnectedControls(true);
             ResetEvent(g_controlEvent);
-            g_audioThread = std::thread(SupervisorThread, std::string(targetIP),
+            g_audioThread = std::thread(SupervisorThread,
                                         static_cast<UINT16>(7777));
             SaveUserSettings(true);
         } else if (controlID == 103 && g_connected.load()) {

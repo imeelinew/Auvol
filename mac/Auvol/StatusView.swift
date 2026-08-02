@@ -93,6 +93,9 @@ struct StatusView: View {
                     .font(.caption2.monospacedDigit())
                     .foregroundStyle(.tertiary)
             }
+            Text("路径：\(engine.networkPathName == NetworkPathKind.wired.title ? "有线 Ethernet" : "备用网络（通常 Wi‑Fi）")")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
             if !engine.errorMessage.isEmpty {
                 Text(engine.errorMessage)
                     .font(.caption2)
@@ -245,6 +248,7 @@ struct StatusView: View {
         case "Mac output device changed": return "Mac 输出设备已更改"
         case "System-audio capture stalled": return "系统音频采集已停止响应"
         case "UDP sender failed": return "UDP 发送失败"
+        case "Network path changed": return "网络路径已切换"
         default: return reason
         }
     }

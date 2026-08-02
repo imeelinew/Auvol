@@ -274,6 +274,7 @@ static bool ReadDefaultSystemOutputUID(CFStringRef *outputUID,
 
 AuvolSystemAudioSender *auvol_system_audio_sender_start(
     const char *targetIP,
+    const char *localIP,
     uint16_t port,
     char *errorText,
     uint32_t errorTextCapacity
@@ -315,6 +316,17 @@ AuvolSystemAudioSender *auvol_system_audio_sender_start(
     if (inet_pton(AF_INET, targetIP, &sender->destination.sin_addr) != 1) {
         SetError(errorText, errorTextCapacity, "Invalid Windows IP address");
         goto failed;
+    }
+    if (localIP && localIP[0] != '\0') {
+        struct sockaddr_in local = {};
+        local.sin_family = AF_INET;
+        local.sin_port = 0;
+        if (inet_pton(AF_INET, localIP, &local.sin_addr) != 1 ||
+            bind(sender->socketFD, (struct sockaddr *)&local, sizeof(local)) != 0) {
+            SetError(errorText, errorTextCapacity,
+                     "Cannot bind the wired network interface");
+            goto failed;
+        }
     }
 
     tapDescription =
