@@ -24,6 +24,7 @@ namespace winrt::Auvol::implementation
         int m_mode = 0;
         bool m_running = false;
         bool m_applyingAutoFollow = false;
+        std::string m_deviceName;
 
         void ConfigureWindow();
         void InstallCoreCallbacks();

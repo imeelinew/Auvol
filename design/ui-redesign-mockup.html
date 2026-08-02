@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Auvol UI 整理方案 · 预览</title>
+  <style>
+    :root {
+      --page-bg: #e8e6e1;
+      --page-ink: #1c1b19;
+      --page-muted: #6b6860;
+      --page-line: #d2cfc6;
+      --accent: #0f6cbd;
+      --good: #0f7b3a;
+      --warn: #b75e00;
+      --bad: #c42b1c;
+      --card: #f7f5f0;
+      --font: "Segoe UI", "PingFang SC", "Helvetica Neue", sans-serif;
+      --mono: "Cascadia Mono", "SF Mono", ui-monospace, monospace;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: var(--font);
+      color: var(--page-ink);
+      background:
+        radial-gradient(1200px 600px at 10% -10%, #f4efe4 0%, transparent 55%),
+        radial-gradient(900px 500px at 100% 0%, #dde8f2 0%, transparent 50%),
+        var(--page-bg);
+      line-height: 1.45;
+    }
+
+    .page {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 40px 28px 80px;
+    }
+
+    .intro h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+      font-weight: 650;
+      letter-spacing: -0.02em;
+    }
+    .intro .lede {
+      margin: 0 0 28px;
+      max-width: 68ch;
+      color: var(--page-muted);
+      font-size: 15px;
+    }
+
+    .plan {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 16px;
+      margin-bottom: 36px;
+    }
+    @media (max-width: 900px) {
+      .plan { grid-template-columns: 1fr; }
+    }
+
+    .plan-card {
+      background: var(--card);
+      border: 1px solid var(--page-line);
+      border-radius: 14px;
+      padding: 18px 20px;
+    }
+    .plan-card h2 {
+      margin: 0 0 12px;
+      font-size: 15px;
+      font-weight: 650;
+    }
+    .plan-card ul {
+      margin: 0;
+      padding-left: 18px;
+      font-size: 13.5px;
+      color: #3a3833;
+    }
+    .plan-card li + li { margin-top: 7px; }
+    .plan-card .tag {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+    .keep { color: var(--good); }
+    .drop { color: var(--bad); }
+    .unify { color: var(--accent); }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+    .toolbar label {
+      font-size: 13px;
+      color: var(--page-muted);
+      margin-right: 4px;
+    }
+    .seg {
+      display: inline-flex;
+      background: #ddd9d0;
+      border-radius: 8px;
+      padding: 3px;
+      gap: 2px;
+    }
+    .seg button {
+      border: 0;
+      background: transparent;
+      padding: 7px 12px;
+      border-radius: 6px;
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+      color: #3f3d38;
+    }
+    .seg button.active {
+      background: #fff;
+      color: #111;
+      box-shadow: 0 1px 2px rgba(0,0,0,.12);
+    }
+    .hint {
+      font-size: 12.5px;
+      color: var(--page-muted);
+      margin-left: auto;
+    }
+
+    .stage {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 28px;
+      align-items: start;
+    }
+    @media (max-width: 980px) {
+      .stage { grid-template-columns: 1fr; }
+    }
+
+    .panel-label {
+      font-size: 12px;
+      font-weight: 650;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--page-muted);
+      margin: 0 0 10px;
+    }
+
+    /* ========== Windows WinUI mock ========== */
+    .win-shell {
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow:
+        0 0 0 1px rgba(0,0,0,.35),
+        0 24px 60px rgba(0,0,0,.28);
+      background: #1c1c1c;
+      color: #fff;
+      font-family: "Segoe UI Variable", "Segoe UI", "PingFang SC", sans-serif;
+    }
+    .win-titlebar {
+      height: 32px;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 8px;
+      background: rgba(32,32,32,.92);
+      border-bottom: 1px solid rgba(255,255,255,.06);
+      font-size: 12px;
+      color: #e6e6e6;
+    }
+    .win-titlebar .ico {
+      width: 14px; height: 14px; border-radius: 3px;
+      background: linear-gradient(135deg, #4ea1ff, #0f6cbd);
+    }
+    .win-traffic {
+      margin-left: auto;
+      display: flex;
+      gap: 1px;
+    }
+    .win-traffic span {
+      width: 46px; height: 32px;
+      display: grid; place-items: center;
+      opacity: .7; font-size: 10px;
+    }
+
+    .win-body {
+      padding: 28px 40px 36px;
+      background:
+        linear-gradient(180deg, rgba(40,44,48,.55), rgba(28,28,28,.92)),
+        #202020;
+      max-height: 760px;
+      overflow: auto;
+    }
+    .win-hero h1 {
+      margin: 0;
+      font-size: 28px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    .win-hero p {
+      margin: 6px 0 0;
+      color: rgba(255,255,255,.55);
+      font-size: 13.5px;
+    }
+
+    .win-section-title {
+      margin: 26px 0 10px;
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .win-card {
+      background: rgba(255,255,255,.045);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .win-row {
+      display: grid;
+      grid-template-columns: 28px 1fr auto;
+      gap: 14px;
+      align-items: center;
+      padding: 14px 16px;
+      min-height: 64px;
+    }
+    .win-row + .win-row,
+    .win-divider {
+      border-top: 1px solid rgba(255,255,255,.08);
+    }
+    .win-icon {
+      width: 20px; height: 20px;
+      opacity: .72;
+      display: grid; place-items: center;
+    }
+    .win-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; }
+    .win-row-title {
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .win-row-sub {
+      margin-top: 2px;
+      font-size: 12px;
+      color: rgba(255,255,255,.48);
+    }
+    .win-row-sub.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+    .win-input {
+      width: 210px;
+      height: 32px;
+      border-radius: 4px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.28);
+      color: #fff;
+      padding: 0 10px;
+      font: inherit;
+      font-size: 13px;
+      font-family: var(--mono);
+    }
+    .win-input:focus {
+      outline: 2px solid rgba(15,108,189,.55);
+      outline-offset: 1px;
+    }
+
+    .win-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .win-switch {
+      width: 40px; height: 20px;
+      border-radius: 999px;
+      background: #0f6cbd;
+      position: relative;
+    }
+    .win-switch::after {
+      content: "";
+      position: absolute;
+      top: 2px; right: 2px;
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: #fff;
+    }
+    .win-switch-label { font-size: 12px; color: rgba(255,255,255,.7); }
+
+    .win-ghost-btn {
+      height: 32px;
+      padding: 0 12px;
+      border-radius: 4px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      color: #fff;
+      font: inherit;
+      font-size: 12.5px;
+      cursor: pointer;
+    }
+
+    .win-dir {
+      display: flex;
+      gap: 8px;
+    }
+    .win-dir button {
+      min-width: 138px;
+      height: 36px;
+      border-radius: 4px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.04);
+      color: rgba(255,255,255,.78);
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .win-dir button.active {
+      background: rgba(255,255,255,.12);
+      border-color: rgba(255,255,255,.22);
+      color: #fff;
+    }
+
+    .win-accent {
+      min-width: 120px;
+      height: 36px;
+      border: 0;
+      border-radius: 4px;
+      background: #60cdff;
+      color: #003547;
+      font: inherit;
+      font-size: 13.5px;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 0 16px;
+    }
+    .win-accent.stop {
+      background: rgba(255,255,255,.14);
+      color: #fff;
+    }
+
+    .win-status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #6ccb5f;
+      display: inline-block;
+      margin-right: 8px;
+      box-shadow: 0 0 0 3px rgba(108,203,95,.18);
+    }
+
+    .win-infobar {
+      margin-top: 12px;
+      margin-bottom: 8px;
+      border-radius: 4px;
+      padding: 10px 12px;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      background: rgba(15,123,58,.18);
+      border: 1px solid rgba(108,203,95,.28);
+    }
+    .win-infobar .mark {
+      width: 18px; height: 18px; border-radius: 50%;
+      background: #6ccb5f; color: #0b2a14;
+      display: grid; place-items: center;
+      font-size: 11px; font-weight: 700;
+      flex: none; margin-top: 1px;
+    }
+    .win-infobar strong {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .win-infobar span {
+      font-size: 12.5px;
+      color: rgba(255,255,255,.72);
+    }
+
+    .win-stats {
+      margin-top: 0;
+    }
+    .win-stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 12px 16px;
+      font-size: 13.5px;
+    }
+    .win-stat-row + .win-stat-row {
+      border-top: 1px solid rgba(255,255,255,.08);
+    }
+    .win-stat-row .k { color: rgba(255,255,255,.72); }
+    .win-stat-row .v {
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+      max-width: 58%;
+    }
+    .win-stat-row .v.muted { font-weight: 500; color: rgba(255,255,255,.55); }
+
+    .win-note {
+      margin-top: 10px;
+      font-size: 11.5px;
+      color: rgba(255,255,255,.38);
+    }
+
+    /* ========== macOS popover mock ========== */
+    .mac-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      padding-top: 8px;
+    }
+    .mac-menubar {
+      width: 100%;
+      max-width: 340px;
+      height: 28px;
+      border-radius: 8px 8px 0 0;
+      background: linear-gradient(180deg, #3a3a3c, #2c2c2e);
+      color: #f5f5f7;
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      font-size: 12px;
+      gap: 10px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.18);
+    }
+    .mac-menubar .left {
+      opacity: .7;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+    }
+    .mac-menubar .right {
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .mac-menubar .clock { opacity: .55; }
+    .sf-wave {
+      width: 16px;
+      height: 14px;
+      display: block;
+      color: #0a84ff;
+      transition: color .15s ease;
+    }
+    .sf-wave svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .icon-swatches {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+    .icon-swatch {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: #2c2c2e;
+      color: #f5f5f7;
+      font-size: 12px;
+    }
+    .icon-swatch .sf-wave { width: 18px; height: 16px; }
+
+    .mac-popover {
+      width: 320px;
+      background: rgba(246,246,246,.96);
+      border: 1px solid rgba(0,0,0,.12);
+      border-radius: 12px;
+      box-shadow:
+        0 18px 50px rgba(0,0,0,.22),
+        0 2px 6px rgba(0,0,0,.08);
+      padding: 14px 18px 12px;
+      color: #1d1d1f;
+      font-family: -apple-system, "SF Pro Text", "PingFang SC", "Helvetica Neue", sans-serif;
+      backdrop-filter: blur(20px);
+    }
+
+    .mac-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .mac-header h1 {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 650;
+    }
+    .mac-header .status {
+      margin-left: auto;
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #34c759;
+    }
+
+    .mac-seg {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      background: rgba(118,118,128,.16);
+      border-radius: 8px;
+      padding: 2px;
+      margin-bottom: 12px;
+    }
+    .mac-seg button {
+      border: 0;
+      background: transparent;
+      height: 28px;
+      border-radius: 6px;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 510;
+      color: #1d1d1f;
+      cursor: pointer;
+    }
+    .mac-seg button.active {
+      background: #fff;
+      box-shadow: 0 1px 2px rgba(0,0,0,.12), 0 0 0 0.5px rgba(0,0,0,.04);
+    }
+
+    .mac-block { margin-bottom: 10px; }
+    .mac-line {
+      font-size: 12px;
+      color: #6e6e73;
+    }
+    .mac-line.primary {
+      color: #3a3a3c;
+      font-size: 12.5px;
+    }
+    .mac-follow {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .mac-follow input {
+      margin-top: 2px;
+      accent-color: #007aff;
+    }
+    .mac-follow .copy {
+      flex: 1;
+      min-width: 0;
+    }
+    .mac-follow .title {
+      font-size: 12.5px;
+      color: #1d1d1f;
+    }
+    .mac-follow .sub {
+      font-size: 11px;
+      color: #8e8e93;
+      margin-top: 2px;
+    }
+    .mac-follow .use {
+      border: 0;
+      background: none;
+      color: #007aff;
+      font: inherit;
+      font-size: 11px;
+      cursor: pointer;
+      padding: 0;
+      white-space: nowrap;
+    }
+
+    .mac-divider {
+      height: 1px;
+      background: rgba(60,60,67,.12);
+      margin: 10px 0;
+      border: 0;
+    }
+
+    .mac-buffer {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #6e6e73;
+      margin-bottom: 6px;
+    }
+    .mac-buffer .val {
+      font-variant-numeric: tabular-nums;
+      color: #1d1d1f;
+    }
+    .mac-slider {
+      appearance: none;
+      width: 100%;
+      height: 4px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #007aff 0 18%, rgba(120,120,128,.28) 18% 100%);
+      outline: none;
+    }
+    .mac-slider::-webkit-slider-thumb {
+      appearance: none;
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: #fff;
+      border: 0.5px solid rgba(0,0,0,.12);
+      box-shadow: 0 1px 3px rgba(0,0,0,.25);
+    }
+
+    .mac-kv {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 12px;
+      padding: 3px 0;
+      font-variant-numeric: tabular-nums;
+    }
+    .mac-kv .k { color: #6e6e73; }
+    .mac-kv .v {
+      color: #1d1d1f;
+      text-align: right;
+      max-width: 62%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .mac-kv .v.good { color: #248a3d; }
+    .mac-kv .v.warn { color: #b75e00; }
+
+    .mac-footer {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .mac-footer .actions {
+      display: flex;
+      gap: 10px;
+    }
+    .mac-footer button {
+      border: 0;
+      background: none;
+      color: #007aff;
+      font: inherit;
+      font-size: 12px;
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .legend {
+      margin-top: 36px;
+      background: var(--card);
+      border: 1px solid var(--page-line);
+      border-radius: 14px;
+      padding: 18px 20px;
+    }
+    .legend h2 {
+      margin: 0 0 10px;
+      font-size: 15px;
+    }
+    .legend table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .legend th, .legend td {
+      text-align: left;
+      padding: 8px 10px;
+      border-top: 1px solid var(--page-line);
+      vertical-align: top;
+    }
+    .legend th {
+      font-size: 12px;
+      color: var(--page-muted);
+      font-weight: 600;
+      width: 22%;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 650;
+      padding: 2px 7px;
+      border-radius: 999px;
+      margin-right: 4px;
+    }
+    .badge.on { background: #e4f5ea; color: #0f7b3a; }
+    .badge.off { background: #f8e4e2; color: #c42b1c; }
+    .badge.opt { background: #e8eef8; color: #0f6cbd; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="intro">
+      <h1>Auvol UI 整理方案预览</h1>
+      <p class="lede">
+        这一轮只做 UI 与文案调整，核心传输 / 跟随 / 恢复逻辑不动。Windows 保留现有 WinUI 卡片架构与视觉风格；
+        macOS 保留菜单栏 popover。两端展示同一套用户可读状态；菜单栏图标改为 SF Symbol
+        <code>wave.3.forward</code>（蓝 / 橙 / 红）。本页是静态 HTML 效果稿。
+      </p>
+    </header>
+
+    <section class="plan">
+      <article class="plan-card">
+        <div class="tag">优化原则</div>
+        <h2>统一信息，而不是统一控件外形</h2>
+        <ul>
+          <li><span class="unify">相通字段：</span>方向、连接状态、自动跟随耳机、播放/采集设备、信号、链路质量、网络路径（Mac）。</li>
+          <li><span class="keep">保留控制：</span>对端 IP、方向切换、开始/停止（Win）或暂停/退出（Mac）、缓冲目标滑杆（仅 Mac 接收）。</li>
+          <li><span class="drop">默认隐藏：</span>当前缓冲、输出/源周期、时钟校正、数据包速率、丢失/迟到、欠载、溢出、采集异常、原始统计串，以及 <strong>ALV2 · 采样率 · 声道</strong>。</li>
+          <li><span class="drop">删废话：</span>去掉各行说明性副标题；菜单栏去掉旧的箭头+波形+色点组合图标。</li>
+        </ul>
+      </article>
+      <article class="plan-card">
+        <div class="tag">菜单栏图标</div>
+        <h2><code>wave.3.forward</code> 三态上色</h2>
+        <ul>
+          <li>正常连接：<strong style="color:#0a84ff">蓝色</strong></li>
+          <li>暂停：<strong style="color:#ff9f0a">橙色</strong></li>
+          <li>有问题：<strong style="color:#ff453a">红色</strong></li>
+          <li>不再用绿色状态点，也不再叠箭头 / waveform 复合图标。</li>
+        </ul>
+        <div class="icon-swatches" aria-hidden="true">
+          <div class="icon-swatch"><span class="sf-wave" style="color:#0a84ff"><svg viewBox="0 0 16 14" fill="none"><path d="M3.2 5.2c.7.7.7 2.9 0 3.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M6.2 3.4c1.4 1.4 1.4 5.8 0 7.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M9.2 1.6c2.1 2.1 2.1 8.7 0 10.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span> 连接</div>
+          <div class="icon-swatch"><span class="sf-wave" style="color:#ff9f0a"><svg viewBox="0 0 16 14" fill="none"><path d="M3.2 5.2c.7.7.7 2.9 0 3.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M6.2 3.4c1.4 1.4 1.4 5.8 0 7.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M9.2 1.6c2.1 2.1 2.1 8.7 0 10.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span> 暂停</div>
+          <div class="icon-swatch"><span class="sf-wave" style="color:#ff453a"><svg viewBox="0 0 16 14" fill="none"><path d="M3.2 5.2c.7.7.7 2.9 0 3.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M6.2 3.4c1.4 1.4 1.4 5.8 0 7.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M9.2 1.6c2.1 2.1 2.1 8.7 0 10.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span> 故障</div>
+        </div>
+      </article>
+    </section>
+
+    <div class="toolbar">
+      <label>预览场景</label>
+      <div class="seg" id="sceneSeg">
+        <button type="button" class="active" data-scene="receive">Windows → Mac</button>
+        <button type="button" data-scene="send">Mac → Windows</button>
+        <button type="button" data-scene="idle">已暂停</button>
+        <button type="button" data-scene="error">有问题</button>
+      </div>
+      <span class="hint">切换后，两端预览与菜单栏图标颜色会同步更新</span>
+    </div>
+
+    <div class="stage">
+      <!-- Windows -->
+      <section>
+        <p class="panel-label">Windows · WinUI 新方案</p>
+        <div class="win-shell" aria-label="Windows Auvol mock">
+          <div class="win-titlebar">
+            <div class="ico" aria-hidden="true"></div>
+            <span>Auvol</span>
+            <div class="win-traffic" aria-hidden="true">
+              <span>—</span><span>□</span><span>×</span>
+            </div>
+          </div>
+          <div class="win-body">
+            <div class="win-hero">
+              <h1>Auvol</h1>
+              <p>局域网系统音频传输</p>
+            </div>
+
+            <div class="win-section-title">连接</div>
+            <div class="win-card">
+              <div class="win-row">
+                <div class="win-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                </div>
+                <div>
+                  <div class="win-row-title">对端 Mac</div>
+                  <div class="win-row-sub">局域网 IPv4</div>
+                </div>
+                <input class="win-input" value="192.168.101.169" readonly />
+              </div>
+              <div class="win-row">
+                <div class="win-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 16 0"/><path d="M7.5 12a4.5 4.5 0 0 1 9 0"/><circle cx="12" cy="16" r="1.2" fill="currentColor" stroke="none"/></svg>
+                </div>
+                <div>
+                  <div class="win-row-title">自动跟随耳机</div>
+                  <div class="win-row-sub" id="winFollowSub">WF-1000XM5</div>
+                </div>
+                <div class="win-toggle">
+                  <button class="win-ghost-btn" type="button">设为当前</button>
+                  <div class="win-switch" title="开启"></div>
+                  <span class="win-switch-label">开</span>
+                </div>
+              </div>
+              <div class="win-row">
+                <div class="win-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                </div>
+                <div>
+                  <div class="win-row-title">连接状态</div>
+                </div>
+                <div style="font-size:14px;font-weight:600">
+                  <span class="win-status-dot" id="winDot"></span><span id="winConn">运行中</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="win-section-title">音频传输</div>
+            <div class="win-card">
+              <div class="win-row">
+                <div class="win-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                </div>
+                <div>
+                  <div class="win-row-title">传输方向</div>
+                </div>
+                <div class="win-dir" id="winDir">
+                  <button type="button" class="active" data-dir="receive">Windows → Mac</button>
+                  <button type="button" data-dir="send">Mac → Windows</button>
+                </div>
+              </div>
+              <div class="win-row">
+                <div class="win-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor" stroke="none"/></svg>
+                </div>
+                <div>
+                  <div class="win-row-title">传输控制</div>
+                </div>
+                <button class="win-accent stop" type="button" id="winTransport">停止传输</button>
+              </div>
+            </div>
+
+            <div class="win-infobar" id="winInfo">
+              <div class="mark">✓</div>
+              <div>
+                <strong id="winInfoTitle">已连接</strong>
+                <span id="winInfoMsg">正在向 Mac 发送 Windows 音频</span>
+              </div>
+            </div>
+
+            <div class="win-section-title">状态</div>
+            <div class="win-card win-stats">
+              <div class="win-stat-row">
+                <span class="k" id="winDeviceKey">采集设备</span>
+                <span class="v" id="winDevice">扬声器 (Realtek)</span>
+              </div>
+              <div class="win-stat-row">
+                <span class="k">信号</span>
+                <span class="v" id="winSignal">-18.4 dBFS</span>
+              </div>
+              <div class="win-stat-row">
+                <span class="k">链路</span>
+                <span class="v" id="winQuality">正常</span>
+              </div>
+            </div>
+            <p class="win-note">原先「实时传输详情」展开区、原始统计串、以及 ALV2/采样率/声道默认不再展示。</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- macOS -->
+      <section>
+        <p class="panel-label">macOS · 菜单栏新方案</p>
+        <div class="mac-wrap">
+          <div class="mac-menubar" aria-hidden="true">
+            <span class="left">● ● ●</span>
+            <div class="right">
+              <span class="sf-wave" id="macMenuIcon" title="wave.3.forward">
+                <svg viewBox="0 0 16 14" fill="none" aria-hidden="true">
+                  <path d="M3.2 5.2c.7.7.7 2.9 0 3.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                  <path d="M6.2 3.4c1.4 1.4 1.4 5.8 0 7.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                  <path d="M9.2 1.6c2.1 2.1 2.1 8.7 0 10.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                </svg>
+              </span>
+              <span class="clock">9:41</span>
+            </div>
+          </div>
+
+          <div class="mac-popover" aria-label="macOS Auvol menu mock">
+            <div class="mac-header">
+              <h1>Auvol</h1>
+              <div class="status" id="macDot"></div>
+            </div>
+
+            <div class="mac-seg" id="macDir">
+              <button type="button" class="active" data-dir="receive">Windows → Mac</button>
+              <button type="button" data-dir="send">Mac → Windows</button>
+            </div>
+
+            <div class="mac-block">
+              <div class="mac-follow">
+                <input type="checkbox" checked disabled />
+                <div class="copy">
+                  <div class="title">自动跟随耳机</div>
+                  <div class="sub" id="macFollowSub">WF-1000XM5</div>
+                </div>
+                <button class="use" type="button">使用当前</button>
+              </div>
+              <div class="mac-line primary" id="macStatus">已连接 · 传入音频静音</div>
+              <div class="mac-line" id="macPeer">192.168.101.170 · 有线</div>
+            </div>
+
+            <hr class="mac-divider" />
+
+            <div class="mac-block" id="macBufferBlock">
+              <div class="mac-buffer">
+                <span>缓冲目标</span>
+                <span class="val">12 ms</span>
+              </div>
+              <input class="mac-slider" type="range" min="8" max="80" value="12" disabled />
+            </div>
+
+            <hr class="mac-divider" id="macBufferDivider" />
+
+            <div class="mac-block">
+              <div class="mac-kv">
+                <span class="k" id="macDeviceKey">播放设备</span>
+                <span class="v" id="macDevice">WF-1000XM5</span>
+              </div>
+              <div class="mac-kv">
+                <span class="k">信号</span>
+                <span class="v" id="macSignal">静音</span>
+              </div>
+              <div class="mac-kv">
+                <span class="k">链路</span>
+                <span class="v good" id="macQuality">正常</span>
+              </div>
+            </div>
+
+            <hr class="mac-divider" />
+
+            <div class="mac-footer">
+              <div class="actions">
+                <button type="button" id="macPause">暂停</button>
+                <button type="button">退出</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="legend">
+      <h2>字段对照（本方案默认可见）</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>信息</th>
+            <th>Windows</th>
+            <th>macOS</th>
+            <th>相对现状</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>传输方向</td>
+            <td>Windows → Mac / Mac → Windows</td>
+            <td>同左（分段控件）</td>
+            <td><span class="badge on">保留</span> Mac 文案对齐</td>
+          </tr>
+          <tr>
+            <td>对端地址</td>
+            <td>对端 Mac IP 输入</td>
+            <td>接收时显示来源 IP；发送时显示 Windows 地址输入（实现阶段）</td>
+            <td><span class="badge on">保留</span></td>
+          </tr>
+          <tr>
+            <td>自动跟随耳机</td>
+            <td>开关 + 设备名 + 设为当前</td>
+            <td>开关 + 设备名 + 使用当前</td>
+            <td><span class="badge on">保留</span> 去掉解释性长句</td>
+          </tr>
+          <tr>
+            <td>连接 / 传输状态</td>
+            <td>连接状态 + InfoBar 短句</td>
+            <td>状态点 + 一行状态；菜单栏 <code>wave.3.forward</code> 上色</td>
+            <td><span class="badge on">保留</span> 图标改为三态色</td>
+          </tr>
+          <tr>
+            <td>缓冲目标</td>
+            <td>—</td>
+            <td>仅接收模式显示滑杆</td>
+            <td><span class="badge on">保留</span> 平台专属控制</td>
+          </tr>
+          <tr>
+            <td>设备 / 信号 / 链路</td>
+            <td>状态卡片三行</td>
+            <td>三行</td>
+            <td><span class="badge opt">统一</span> Win 补设备</td>
+          </tr>
+          <tr>
+            <td>ALV2 · 采样率 · 声道</td>
+            <td>不展示</td>
+            <td>不展示</td>
+            <td><span class="badge off">删除</span></td>
+          </tr>
+          <tr>
+            <td>当前缓冲 / 周期 / 时钟校正 / 包速率 / 欠载溢出等</td>
+            <td>默认不展示</td>
+            <td>默认不展示</td>
+            <td><span class="badge off">移除出主界面</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  </div>
+
+  <script>
+    const scenes = {
+      receive: {
+        winConn: "运行中",
+        winDot: "#6ccb5f",
+        winTransport: "停止传输",
+        winTransportStop: true,
+        winInfoTitle: "已连接",
+        winInfoMsg: "正在向 Mac 发送 Windows 音频",
+        winInfoBg: "rgba(15,123,58,.18)",
+        winInfoBorder: "rgba(108,203,95,.28)",
+        winDeviceKey: "采集设备",
+        winDevice: "扬声器 (Realtek)",
+        winSignal: "-18.4 dBFS",
+        winQuality: "正常",
+        winFollow: "WF-1000XM5",
+        macStatus: "已连接 · 传入音频静音",
+        macPeer: "192.168.101.170 · 有线",
+        macDeviceKey: "播放设备",
+        macDevice: "WF-1000XM5",
+        macSignal: "静音",
+        macQuality: "正常",
+        macQualityClass: "good",
+        macDot: "#0a84ff",
+        macIcon: "#0a84ff",
+        macPause: "暂停",
+        showBuffer: true,
+        dir: "receive",
+      },
+      send: {
+        winConn: "运行中",
+        winDot: "#6ccb5f",
+        winTransport: "停止传输",
+        winTransportStop: true,
+        winInfoTitle: "已连接",
+        winInfoMsg: "正在播放 Mac 音频",
+        winInfoBg: "rgba(15,123,58,.18)",
+        winInfoBorder: "rgba(108,203,95,.28)",
+        winDeviceKey: "播放设备",
+        winDevice: "耳机 (WF-1000XM5)",
+        winSignal: "-12.1 dBFS",
+        winQuality: "正常",
+        winFollow: "WF-1000XM5",
+        macStatus: "正在向 Windows 发送",
+        macPeer: "192.168.101.170 · 有线",
+        macDeviceKey: "采集设备",
+        macDevice: "MacBook Air 扬声器",
+        macSignal: "-9.6 dBFS",
+        macQuality: "正常",
+        macQualityClass: "good",
+        macDot: "#0a84ff",
+        macIcon: "#0a84ff",
+        macPause: "暂停",
+        showBuffer: false,
+        dir: "send",
+      },
+      idle: {
+        winConn: "空闲",
+        winDot: "rgba(255,255,255,.35)",
+        winTransport: "开始传输",
+        winTransportStop: false,
+        winInfoTitle: "已暂停",
+        winInfoMsg: "选择方向后开始传输",
+        winInfoBg: "rgba(255,255,255,.06)",
+        winInfoBorder: "rgba(255,255,255,.1)",
+        winDeviceKey: "采集设备",
+        winDevice: "—",
+        winSignal: "—",
+        winQuality: "—",
+        winFollow: "WF-1000XM5",
+        macStatus: "已暂停",
+        macPeer: "等待开始",
+        macDeviceKey: "播放设备",
+        macDevice: "—",
+        macSignal: "—",
+        macQuality: "—",
+        macQualityClass: "",
+        macDot: "#ff9f0a",
+        macIcon: "#ff9f0a",
+        macPause: "继续",
+        showBuffer: true,
+        dir: "receive",
+      },
+      error: {
+        winConn: "需要处理",
+        winDot: "#ff453a",
+        winTransport: "停止传输",
+        winTransportStop: true,
+        winInfoTitle: "传输错误",
+        winInfoMsg: "无法打开 Windows 输出设备",
+        winInfoBg: "rgba(196,43,28,.18)",
+        winInfoBorder: "rgba(255,69,58,.35)",
+        winDeviceKey: "播放设备",
+        winDevice: "—",
+        winSignal: "—",
+        winQuality: "异常",
+        winFollow: "WF-1000XM5",
+        macStatus: "连接异常",
+        macPeer: "请检查网络或对端",
+        macDeviceKey: "播放设备",
+        macDevice: "WF-1000XM5",
+        macSignal: "—",
+        macQuality: "异常",
+        macQualityClass: "warn",
+        macDot: "#ff453a",
+        macIcon: "#ff453a",
+        macPause: "暂停",
+        showBuffer: true,
+        dir: "receive",
+      },
+    };
+
+    function applyScene(name) {
+      const s = scenes[name];
+      document.getElementById("winConn").textContent = s.winConn;
+      document.getElementById("winDot").style.background = s.winDot;
+      document.getElementById("winDot").style.boxShadow =
+        name === "idle" || name === "error" ? "none" : "0 0 0 3px rgba(108,203,95,.18)";
+      const transport = document.getElementById("winTransport");
+      transport.textContent = s.winTransport;
+      transport.classList.toggle("stop", s.winTransportStop);
+      document.getElementById("winInfoTitle").textContent = s.winInfoTitle;
+      document.getElementById("winInfoMsg").textContent = s.winInfoMsg;
+      const info = document.getElementById("winInfo");
+      info.style.background = s.winInfoBg;
+      info.style.borderColor = s.winInfoBorder;
+      document.getElementById("winDeviceKey").textContent = s.winDeviceKey;
+      document.getElementById("winDevice").textContent = s.winDevice;
+      document.getElementById("winSignal").textContent = s.winSignal;
+      document.getElementById("winQuality").textContent = s.winQuality;
+      document.getElementById("winFollowSub").textContent = s.winFollow;
+
+      document.getElementById("macStatus").textContent = s.macStatus;
+      document.getElementById("macPeer").textContent = s.macPeer;
+      document.getElementById("macDeviceKey").textContent = s.macDeviceKey;
+      document.getElementById("macDevice").textContent = s.macDevice;
+      document.getElementById("macSignal").textContent = s.macSignal;
+      const mq = document.getElementById("macQuality");
+      mq.textContent = s.macQuality;
+      mq.className = "v " + (s.macQualityClass || "");
+      document.getElementById("macDot").style.background = s.macDot;
+      document.getElementById("macMenuIcon").style.color = s.macIcon;
+      document.getElementById("macPause").textContent = s.macPause;
+      document.getElementById("macBufferBlock").style.display = s.showBuffer ? "" : "none";
+      document.getElementById("macBufferDivider").style.display = s.showBuffer ? "" : "none";
+
+      document.querySelectorAll("#winDir button").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.dir === s.dir);
+      });
+      document.querySelectorAll("#macDir button").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.dir === s.dir);
+      });
+    }
+
+    document.getElementById("sceneSeg").addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-scene]");
+      if (!btn) return;
+      document.querySelectorAll("#sceneSeg button").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      applyScene(btn.dataset.scene);
+    });
+
+    document.getElementById("winDir").addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-dir]");
+      if (!btn) return;
+      const scene = btn.dataset.dir === "send" ? "send" : "receive";
+      document.querySelectorAll("#sceneSeg button").forEach((b) => {
+        b.classList.toggle("active", b.dataset.scene === scene);
+      });
+      applyScene(scene);
+    });
+
+    document.getElementById("macDir").addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-dir]");
+      if (!btn) return;
+      const scene = btn.dataset.dir === "send" ? "send" : "receive";
+      document.querySelectorAll("#sceneSeg button").forEach((b) => {
+        b.classList.toggle("active", b.dataset.scene === scene);
+      });
+      applyScene(scene);
+    });
+
+    applyScene("receive");
+  </script>
+</body>
+</html>

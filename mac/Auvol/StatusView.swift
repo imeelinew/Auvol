@@ -16,9 +16,7 @@ struct StatusView: View {
                 latencyControl
             }
             Divider()
-            timingStats
-            Divider()
-            healthStats
+            statusStats
             Divider()
             footer
         }
@@ -43,7 +41,7 @@ struct StatusView: View {
             set: { engine.selectRole($0) }
         )) {
             ForEach(TransportRole.allCases, id: \.self) { role in
-                Text(role == .receive ? "从 Windows 接收" : "发送到 Windows")
+                Text(role == .receive ? "Windows → Mac" : "Mac → Windows")
                     .tag(role)
             }
         }
@@ -53,7 +51,7 @@ struct StatusView: View {
 
     private var autoFollowControl: some View {
         VStack(alignment: .leading, spacing: 5) {
-            Toggle("自动跟随指定蓝牙耳机", isOn: Binding(
+            Toggle("自动跟随耳机", isOn: Binding(
                 get: { engine.autoFollowEnabled },
                 set: { engine.setAutoFollowEnabled($0) }
             ))
@@ -65,7 +63,7 @@ struct StatusView: View {
                 Spacer()
                 if engine.currentSystemOutputIsBluetooth &&
                     engine.currentSystemOutputName != engine.followedOutputName {
-                    Button("使用当前输出") {
+                    Button("使用当前") {
                         engine.followCurrentBluetoothOutput()
                     }
                     .buttonStyle(.borderless)
@@ -77,23 +75,18 @@ struct StatusView: View {
 
     private var autoFollowDescription: String {
         if !engine.autoFollowEnabled {
-            return "关闭时仅响应手动方向切换。"
+            return "未启用"
         }
         if engine.followedOutputName.isEmpty {
-            return "等待蓝牙耳机成为 Mac 默认输出。"
+            return "等待耳机成为默认输出"
         }
-        return "正在跟随：\(engine.followedOutputName)"
+        return engine.followedOutputName
     }
 
     private var connection: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(connectionTitle)
-            if engine.role == .receive && !engine.senderIP.isEmpty {
-                Text(engine.senderIP)
-                    .font(.caption2.monospacedDigit())
-                    .foregroundStyle(.tertiary)
-            }
-            Text("路径：\(engine.networkPathName == NetworkPathKind.wired.title ? "有线 Ethernet" : "备用网络（通常 Wi‑Fi）")")
+            Text(connectionDetail)
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
             if !engine.errorMessage.isEmpty {
@@ -106,6 +99,18 @@ struct StatusView: View {
         .foregroundStyle(.secondary)
     }
 
+    private var connectionDetail: String {
+        let path = engine.networkPathName == NetworkPathKind.wired.title
+            ? "有线" : "备用网络"
+        if engine.role == .receive && !engine.senderIP.isEmpty {
+            return "\(engine.senderIP) · \(path)"
+        }
+        if engine.role == .send && !engine.peerIP.isEmpty {
+            return "\(engine.peerIP) · \(path)"
+        }
+        return path
+    }
+
     private var peerControl: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text("Windows 地址")
@@ -116,9 +121,6 @@ struct StatusView: View {
                 set: { engine.setPeerIP($0) }
             ))
             .textFieldStyle(.roundedBorder)
-            Text("地址修改后会自动应用。")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
         }
     }
 
@@ -143,39 +145,52 @@ struct StatusView: View {
         }
     }
 
-    private var timingStats: some View {
+    private var statusStats: some View {
         VStack(spacing: 4) {
-            if engine.role == .receive {
-                statRow("当前缓冲", String(format: "%.1f ms", engine.bufferLevelMs))
-                statRow("输出周期", String(format: "%.1f ms", engine.outputQuantumMs))
-                statRow("时钟校正", String(format: "%+.0f ppm", engine.driftPPM))
-            }
-            statRow("源周期", String(format: "%.1f ms", engine.sourcePeriodMs))
-        }
-    }
-
-    private var healthStats: some View {
-        VStack(spacing: 4) {
-            statRow("数据包", "\(engine.packetRate)/秒")
-            statRow("信号", engine.hasSignal
-                    ? String(format: "%.1f dBFS", engine.signalLevelDBFS)
-                    : "静音")
             if !engine.outputDeviceName.isEmpty {
                 statRow(engine.role == .receive ? "播放设备" : "采集设备",
                         engine.outputDeviceName)
             }
-            if engine.role == .receive {
-                statRow("丢失 / 迟到", "\(engine.lostPackets) / \(engine.latePackets)")
-                statRow("音频欠载", "\(engine.starvedFramesPerSecond) 帧/秒")
-                statRow("缓冲溢出", "\(engine.overflowFrames) 帧")
-                if engine.captureGlitches > 0 {
-                    statRow("采集异常", "\(engine.captureGlitches)")
-                }
-            } else if engine.captureCallbackAgeMs > 0 {
-                statRow("采集回调",
-                        String(format: "%.0f ms 前", engine.captureCallbackAgeMs))
-            }
+            statRow("信号", engine.hasSignal
+                    ? String(format: "%.1f dBFS", engine.signalLevelDBFS)
+                    : (engine.isActive ? "静音" : "—"))
+            statRow("链路", linkQuality)
         }
+    }
+
+    private var linkQuality: String {
+        if !engine.errorMessage.isEmpty {
+            return "异常"
+        }
+        if !engine.isActive {
+            return "—"
+        }
+        if engine.role == .receive {
+            if engine.lostPackets == 0 &&
+                engine.latePackets == 0 &&
+                engine.starvedFramesPerSecond == 0 &&
+                engine.overflowFrames == 0 {
+                return "正常"
+            }
+            var parts: [String] = []
+            if engine.lostPackets > 0 {
+                parts.append("丢包 \(engine.lostPackets)")
+            }
+            if engine.latePackets > 0 {
+                parts.append("迟到 \(engine.latePackets)")
+            }
+            if engine.starvedFramesPerSecond > 0 {
+                parts.append("欠载")
+            }
+            if engine.overflowFrames > 0 {
+                parts.append("溢出")
+            }
+            return parts.joined(separator: " · ")
+        }
+        if engine.captureGlitches > 0 {
+            return "采集异常 \(engine.captureGlitches)"
+        }
+        return "正常"
     }
 
     private func statRow(_ label: String, _ value: String) -> some View {
@@ -189,11 +204,6 @@ struct StatusView: View {
 
     private var footer: some View {
         HStack {
-            if engine.sampleRate > 0 {
-                Text("ALV2 · \(Int(engine.sampleRate)) Hz · 双声道")
-                    .font(.caption2.monospacedDigit())
-                    .foregroundStyle(.tertiary)
-            }
             Spacer()
             Button(engine.isActive ? "暂停" : "继续") {
                 if engine.isActive {
@@ -202,7 +212,7 @@ struct StatusView: View {
                     engine.start()
                 }
             }
-                .buttonStyle(.borderless)
+            .buttonStyle(.borderless)
             Button("退出") {
                 engine.stop()
                 NSApplication.shared.terminate(nil)
@@ -217,7 +227,7 @@ struct StatusView: View {
 
     private var statusColor: Color {
         if engine.isPaused { return .orange }
-        if engine.isSending || engine.isPlaying { return .green }
+        if engine.isSending || engine.isPlaying { return .blue }
         return .red
     }
 
@@ -229,7 +239,7 @@ struct StatusView: View {
         case "Starting system-audio capture": return "正在启动系统音频采集"
         case "Recovering Mac audio output", "Recovering audio output":
             return "正在恢复 Mac 音频输出"
-        case "Sending Mac audio to Windows": return "正在向 Windows 发送 Mac 音频"
+        case "Sending Mac audio to Windows": return "正在向 Windows 发送"
         case "Connected · Mac audio is silent": return "已连接 · Mac 当前静音"
         case "Playing Windows audio": return "正在播放 Windows 音频"
         case "Connected · incoming audio is silent": return "已连接 · 传入音频静音"

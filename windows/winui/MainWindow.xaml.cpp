@@ -38,13 +38,13 @@ namespace
         return value.substr(0, end);
     }
 
-    void ReplaceAll(std::string& value, std::string_view from,
-                    std::string_view to)
+    long long ParseCount(std::string const& value)
     {
-        size_t position = 0;
-        while ((position = value.find(from, position)) != std::string::npos) {
-            value.replace(position, from.size(), to);
-            position += to.size();
+        if (value.empty()) return 0;
+        try {
+            return std::stoll(value);
+        } catch (...) {
+            return 0;
         }
     }
 
@@ -55,61 +55,61 @@ namespace
             std::string_view chinese;
         };
         static constexpr Translation translations[] = {
-            { "Idle", "音频传输已暂停。" },
-            { "Direction control could not initialize Winsock", "无法初始化传输方向控制网络。" },
-            { "Direction control socket could not be opened", "无法打开传输方向控制套接字。" },
-            { "Direction control UDP port 7778 is unavailable", "传输方向控制端口 UDP 7778 不可用。" },
-            { "Switching direction from peer...", "正在根据对端请求切换传输方向…" },
-            { "Cannot open the Windows output device", "无法打开 Windows 输出设备。" },
-            { "Cannot identify the Windows output device", "无法识别 Windows 输出设备。" },
-            { "Cannot monitor the Windows output device", "无法监视 Windows 输出设备。" },
-            { "Cannot observe Windows output changes", "无法监听 Windows 输出设备变化。" },
-            { "Windows output does not accept 32-bit stereo PCM at the Mac sample rate", "Windows 输出设备不支持 Mac 采样率下的 32 位立体声 PCM。" },
-            { "Cannot create low-latency output renderer", "无法创建低延迟音频输出。" },
-            { "Cannot start Windows audio output", "无法启动 Windows 音频输出。" },
-            { "Windows output changed; reconnecting automatically", "Windows 输出设备已变化，正在自动重新连接…" },
-            { "Windows default output changed; reconnecting automatically", "Windows 默认输出设备已变化，正在自动重新连接…" },
-            { "Windows output was invalidated; reconnecting automatically", "Windows 输出设备已失效，正在自动重新连接…" },
-            { "Windows output buffer failed; reconnecting automatically", "Windows 输出缓冲区发生错误，正在自动重新连接…" },
-            { "Windows output commit failed; reconnecting automatically", "Windows 输出提交失败，正在自动重新连接…" },
-            { "COM initialization failed for output playback", "音频播放的 COM 初始化失败。" },
-            { "WSAStartup failed", "Windows 网络初始化失败。" },
-            { "Invalid destination or UDP socket failure", "目标地址无效或 UDP 套接字创建失败。" },
-            { "COM initialization failed", "COM 初始化失败。" },
-            { "Audio device enumeration failed", "无法枚举音频设备。" },
-            { "No default output device", "未找到默认音频输出设备。" },
+            { "Idle", "选择方向后开始传输" },
+            { "Direction control could not initialize Winsock", "无法初始化传输方向控制网络" },
+            { "Direction control socket could not be opened", "无法打开传输方向控制套接字" },
+            { "Direction control UDP port 7778 is unavailable", "传输方向控制端口 UDP 7778 不可用" },
+            { "Switching direction from peer...", "正在根据对端请求切换方向…" },
+            { "Cannot open the Windows output device", "无法打开 Windows 输出设备" },
+            { "Cannot identify the Windows output device", "无法识别 Windows 输出设备" },
+            { "Cannot monitor the Windows output device", "无法监视 Windows 输出设备" },
+            { "Cannot observe Windows output changes", "无法监听 Windows 输出设备变化" },
+            { "Windows output does not accept 32-bit stereo PCM at the Mac sample rate", "Windows 输出设备不支持 Mac 采样率下的 32 位立体声 PCM" },
+            { "Cannot create low-latency output renderer", "无法创建低延迟音频输出" },
+            { "Cannot start Windows audio output", "无法启动 Windows 音频输出" },
+            { "Windows output changed; reconnecting automatically", "输出设备已变化，正在重新连接…" },
+            { "Windows default output changed; reconnecting automatically", "默认输出已变化，正在重新连接…" },
+            { "Windows output was invalidated; reconnecting automatically", "输出设备已失效，正在重新连接…" },
+            { "Windows output buffer failed; reconnecting automatically", "输出缓冲区错误，正在重新连接…" },
+            { "Windows output commit failed; reconnecting automatically", "输出提交失败，正在重新连接…" },
+            { "COM initialization failed for output playback", "音频播放的 COM 初始化失败" },
+            { "WSAStartup failed", "Windows 网络初始化失败" },
+            { "Invalid destination or UDP socket failure", "目标地址无效或 UDP 套接字创建失败" },
+            { "COM initialization failed", "COM 初始化失败" },
+            { "Audio device enumeration failed", "无法枚举音频设备" },
+            { "No default output device", "未找到默认音频输出设备" },
             { "Cannot identify the default output; retrying", "无法识别默认输出设备，正在重试…" },
             { "Cannot monitor the default output; retrying", "无法监视默认输出设备，正在重试…" },
             { "Cannot observe output changes; retrying", "无法监听输出设备变化，正在重试…" },
-            { "Audio endpoint activation failed", "音频端点激活失败。" },
-            { "Cannot read the output mix format", "无法读取输出设备的混音格式。" },
-            { "Default output must be stereo float32 (use VB-Cable)", "默认输出设备必须使用 32 位浮点立体声格式（可使用 VB-Cable）。" },
-            { "Low-latency audio client is unavailable", "低延迟音频客户端不可用。" },
-            { "Cannot set low-latency audio properties", "无法设置低延迟音频属性。" },
-            { "Cannot query the minimum audio-engine period", "无法查询音频引擎的最小周期。" },
-            { "Cannot create the period-control event", "无法创建周期控制事件。" },
-            { "Cannot register the period-control event", "无法注册周期控制事件。" },
-            { "Cannot create the period-control renderer", "无法创建周期控制输出。" },
-            { "Cannot prime the period-control renderer", "无法预热周期控制输出。" },
-            { "Cannot create the audio event", "无法创建音频事件。" },
-            { "WASAPI event registration failed", "WASAPI 事件注册失败。" },
-            { "WASAPI capture service failed", "WASAPI 音频采集服务启动失败。" },
-            { "Period-control renderer failed to start", "周期控制输出启动失败。" },
-            { "WASAPI start failed", "WASAPI 启动失败。" },
-            { "Audio event wait failed; retrying automatically", "等待音频事件失败，正在自动重试…" },
-            { "Windows output changed; rebuilding capture automatically", "Windows 输出设备已变化，正在自动重建采集…" },
-            { "Audio engine was invalidated; retrying automatically", "音频引擎已失效，正在自动重试…" },
-            { "Audio engine buffer failed; retrying automatically", "音频引擎缓冲区发生错误，正在自动重试…" },
-            { "Capture device was invalidated; retrying automatically", "音频采集设备已失效，正在自动重试…" },
-            { "Capture buffer read failed; retrying automatically", "读取采集缓冲区失败，正在自动重试…" },
-            { "Capture release failed; retrying automatically", "释放采集缓冲区失败，正在自动重试…" },
-            { "Default output changed; rebuilding capture automatically", "默认输出设备已变化，正在自动重建采集…" },
-            { "Audio engine stopped responding; retrying automatically", "音频引擎停止响应，正在自动重试…" },
-            { "UDP port 7777 is unavailable", "UDP 端口 7777 不可用。" },
-            { "Listening for Mac audio on UDP 7777", "正在通过 UDP 7777 等待 Mac 音频。" },
-            { "Recovering automatically...", "正在自动恢复音频传输…" },
-            { "Switching direction automatically...", "正在自动切换传输方向…" },
-            { "Selected headphones are on Windows; switching direction...", "指定耳机已成为 Windows 默认输出，正在切换接收端…" },
+            { "Audio endpoint activation failed", "音频端点激活失败" },
+            { "Cannot read the output mix format", "无法读取输出设备的混音格式" },
+            { "Default output must be stereo float32 (use VB-Cable)", "默认输出设备必须使用 32 位浮点立体声格式" },
+            { "Low-latency audio client is unavailable", "低延迟音频客户端不可用" },
+            { "Cannot set low-latency audio properties", "无法设置低延迟音频属性" },
+            { "Cannot query the minimum audio-engine period", "无法查询音频引擎的最小周期" },
+            { "Cannot create the period-control event", "无法创建周期控制事件" },
+            { "Cannot register the period-control event", "无法注册周期控制事件" },
+            { "Cannot create the period-control renderer", "无法创建周期控制输出" },
+            { "Cannot prime the period-control renderer", "无法预热周期控制输出" },
+            { "Cannot create the audio event", "无法创建音频事件" },
+            { "WASAPI event registration failed", "WASAPI 事件注册失败" },
+            { "WASAPI capture service failed", "WASAPI 音频采集服务启动失败" },
+            { "Period-control renderer failed to start", "周期控制输出启动失败" },
+            { "WASAPI start failed", "WASAPI 启动失败" },
+            { "Audio event wait failed; retrying automatically", "等待音频事件失败，正在重试…" },
+            { "Windows output changed; rebuilding capture automatically", "输出设备已变化，正在重建采集…" },
+            { "Audio engine was invalidated; retrying automatically", "音频引擎已失效，正在重试…" },
+            { "Audio engine buffer failed; retrying automatically", "音频引擎缓冲区错误，正在重试…" },
+            { "Capture device was invalidated; retrying automatically", "采集设备已失效，正在重试…" },
+            { "Capture buffer read failed; retrying automatically", "读取采集缓冲区失败，正在重试…" },
+            { "Capture release failed; retrying automatically", "释放采集缓冲区失败，正在重试…" },
+            { "Default output changed; rebuilding capture automatically", "默认输出已变化，正在重建采集…" },
+            { "Audio engine stopped responding; retrying automatically", "音频引擎停止响应，正在重试…" },
+            { "UDP port 7777 is unavailable", "UDP 端口 7777 不可用" },
+            { "Listening for Mac audio on UDP 7777", "正在等待 Mac 音频" },
+            { "Recovering automatically...", "正在自动恢复…" },
+            { "Switching direction automatically...", "正在自动切换方向…" },
+            { "Selected headphones are on Windows; switching direction...", "指定耳机已成为 Windows 默认输出，正在切换…" },
         };
         for (auto const& translation : translations) {
             if (value == translation.english) {
@@ -117,16 +117,18 @@ namespace
             }
         }
         if (value.rfind("Minimum engine period rejected ", 0) == 0) {
-            return "系统拒绝最小音频引擎周期 " + value.substr(31) + "。";
+            return "系统拒绝最小音频引擎周期";
         }
         if (value.rfind("WASAPI initialize failed ", 0) == 0) {
-            return "WASAPI 初始化失败 " + value.substr(25) + "。";
+            return "WASAPI 初始化失败";
         }
-        ReplaceAll(value, " ms engine period (loopback buffer ",
-                   " ms 引擎周期（回环缓冲区 ");
-        ReplaceAll(value, ") -> ", "）→ ");
-        ReplaceAll(value, " ms output period; receiving Mac audio",
-                   " ms 输出周期；正在接收 Mac 音频");
+        if (value.find("receiving Mac audio") != std::string::npos) {
+            return "正在播放 Mac 音频";
+        }
+        if (value.find("engine period") != std::string::npos ||
+            value.find("->") != std::string::npos) {
+            return "正在向 Mac 发送 Windows 音频";
+        }
         return value;
     }
 }
@@ -244,10 +246,11 @@ namespace winrt::Auvol::implementation
         AutoFollowToggle().IsOn(settings.autoFollowEnabled);
         m_applyingAutoFollow = false;
         FollowedOutputText().Text(settings.followedOutputName.empty()
-            ? L"尚未选择耳机；启用后会采用当前的耳机输出。"
-            : winrt::to_hstring("正在跟随：" + settings.followedOutputName));
-        CurrentOutputText().Text(L"正在检测 Windows 默认输出…");
+            ? L"未选择"
+            : winrt::to_hstring(settings.followedOutputName));
         UseCurrentOutputButton().IsEnabled(false);
+        DeviceLabel().Text(m_mode == 0 ? L"采集设备" : L"播放设备");
+        DeviceValue().Text(L"—");
         auvol::StartDirectionControl(peer);
         auvol::StartAutoDirectionMonitor();
 
@@ -273,11 +276,11 @@ namespace winrt::Auvol::implementation
         }
         TransportInfoBar().Severity(InfoBarSeverity::Informational);
         TransportInfoBar().Title(L"正在启动");
-        TransportInfoBar().Message(L"正在打开音频引擎和网络传输…");
+        TransportInfoBar().Message(L"正在启动音频传输…");
         if (!auvol::Start(PeerAddress(), m_mode)) {
             TransportInfoBar().Severity(InfoBarSeverity::Error);
             TransportInfoBar().Title(L"启动失败");
-            TransportInfoBar().Message(L"无法启动音频传输控制器。");
+            TransportInfoBar().Message(L"无法启动音频传输");
         }
     }
 
@@ -287,7 +290,7 @@ namespace winrt::Auvol::implementation
         m_mode = sender == ReceiveModeButton() ? 1 : 0;
         SendModeButton().IsChecked(m_mode == 0);
         ReceiveModeButton().IsChecked(m_mode == 1);
-        RateLabel().Text(m_mode == 0 ? L"采集速率（帧/秒）" : L"播放速率（帧/秒）");
+        DeviceLabel().Text(m_mode == 0 ? L"采集设备" : L"播放设备");
         ResetStats();
         auvol::SwitchMode(m_mode);
         auvol::SaveSettings(PeerAddress(), m_mode, m_running);
@@ -345,34 +348,41 @@ namespace winrt::Auvol::implementation
 
     void MainWindow::UpdateStats(std::string const& text)
     {
-        const auto packets = Trim(Metric(text, "Packets:"));
         const auto signal = Trim(Metric(text, "Signal:"));
-        const auto capture = Trim(Metric(text, "Capture:"));
         const auto render = Trim(Metric(text, "Render:"));
         const auto errors = Trim(Metric(text, "Errors:"));
         const auto lost = Trim(Metric(text, "Lost:"));
-        const auto queue = Trim(Metric(text, "Queue:"));
-        PacketsValue().Text(winrt::to_hstring(packets.empty() ? "0" : packets));
-        SignalValue().Text(winrt::to_hstring(signal.empty() ? "—" : FirstToken(signal)));
         const bool receiving = !render.empty();
-        RateLabel().Text(receiving ? L"播放速率（帧/秒）" : L"采集速率（帧/秒）");
-        RateValue().Text(winrt::to_hstring(FirstToken(receiving ? render : capture)));
-        const std::string quality = receiving
-            ? "丢包：" + (lost.empty() ? std::string("0") : lost) +
-              " · 队列：" + (queue.empty() ? std::string("—") : queue)
-            : "错误：" + (errors.empty() ? std::string("0") : errors);
-        QualityValue().Text(winrt::to_hstring(quality));
-        const std::string rawStats = receiving
-            ? "数据包：" + (packets.empty() ? std::string("0") : packets) +
-              "　信号：" + (signal.empty() ? std::string("—") : signal) +
-              "　播放速率：" + (render.empty() ? std::string("—") : FirstToken(render) + " 帧/秒") +
-              "　丢包：" + (lost.empty() ? std::string("0") : lost) +
-              "　队列：" + (queue.empty() ? std::string("—") : queue)
-            : "数据包：" + (packets.empty() ? std::string("0") : packets) +
-              "　信号：" + (signal.empty() ? std::string("—") : signal) +
-              "　采集速率：" + (capture.empty() ? std::string("—") : FirstToken(capture) + " 帧/秒") +
-              "　错误：" + (errors.empty() ? std::string("0") : errors);
-        RawStatsText().Text(winrt::to_hstring(rawStats));
+
+        if (signal.empty()) {
+            SignalValue().Text(L"—");
+        } else {
+            const auto token = FirstToken(signal);
+            SignalValue().Text(winrt::to_hstring(
+                token == "silent" || token == "Silent" ? "静音" : token));
+        }
+
+        DeviceLabel().Text(receiving ? L"播放设备" : L"采集设备");
+        DeviceValue().Text(m_deviceName.empty()
+            ? L"—"
+            : winrt::to_hstring(m_deviceName));
+
+        if (!m_running) {
+            QualityValue().Text(L"—");
+            return;
+        }
+
+        if (receiving) {
+            const long long lostCount = ParseCount(lost);
+            QualityValue().Text(lostCount > 0
+                ? winrt::to_hstring("丢包 " + lost)
+                : L"正常");
+        } else {
+            const long long errorCount = ParseCount(errors);
+            QualityValue().Text(errorCount > 0
+                ? winrt::to_hstring("错误 " + errors)
+                : L"正常");
+        }
     }
 
     void MainWindow::UpdateRunning(bool running)
@@ -386,6 +396,7 @@ namespace winrt::Auvol::implementation
         StateDot().Fill(Application::Current().Resources().Lookup(
             winrt::box_value(running ? L"SystemFillColorSuccessBrush" :
                                       L"TextFillColorTertiaryBrush")).as<Brush>());
+        DeviceLabel().Text(m_mode == 0 ? L"采集设备" : L"播放设备");
         if (!running) ResetStats();
     }
 
@@ -394,7 +405,7 @@ namespace winrt::Auvol::implementation
         m_mode = mode == 1 ? 1 : 0;
         SendModeButton().IsChecked(m_mode == 0);
         ReceiveModeButton().IsChecked(m_mode == 1);
-        RateLabel().Text(m_mode == 0 ? L"采集速率（帧/秒）" : L"播放速率（帧/秒）");
+        DeviceLabel().Text(m_mode == 0 ? L"采集设备" : L"播放设备");
         ResetStats();
         auvol::SaveSettings(PeerAddress(), m_mode, m_running);
     }
@@ -408,21 +419,22 @@ namespace winrt::Auvol::implementation
         AutoFollowToggle().IsOn(enabled);
         m_applyingAutoFollow = false;
         FollowedOutputText().Text(followedOutputName.empty()
-            ? L"尚未选择耳机；启用后会采用当前的耳机输出。"
-            : winrt::to_hstring("正在跟随：" + followedOutputName));
-        CurrentOutputText().Text(currentOutputAvailable
-            ? winrt::to_hstring("当前默认输出：" + currentOutputName)
-            : L"当前没有可用的默认输出。");
+            ? L"未选择"
+            : winrt::to_hstring(followedOutputName));
+        m_deviceName = currentOutputAvailable ? currentOutputName : std::string{};
+        DeviceValue().Text(m_deviceName.empty()
+            ? L"—"
+            : winrt::to_hstring(m_deviceName));
         UseCurrentOutputButton().IsEnabled(currentOutputAvailable);
     }
 
     void MainWindow::ResetStats()
     {
-        PacketsValue().Text(L"0");
         SignalValue().Text(L"—");
-        RateValue().Text(L"—");
         QualityValue().Text(L"—");
-        RawStatsText().Text(L"暂无传输数据");
+        DeviceValue().Text(m_deviceName.empty()
+            ? L"—"
+            : winrt::to_hstring(m_deviceName));
     }
 
     bool MainWindow::PeerAddressIsValid()
