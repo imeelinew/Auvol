@@ -6,6 +6,7 @@
 
 #include "../AuvolCore.h"
 
+#include <algorithm>
 #include <cstdio>
 
 using namespace winrt::Microsoft::UI::Xaml;
@@ -45,6 +46,23 @@ namespace
             return std::stoll(value);
         } catch (...) {
             return 0;
+        }
+    }
+
+    // The meter shares its range with the macOS receiver so both ends read alike.
+    constexpr double kMeterFloorDBFS = -60.0;
+    constexpr double kMeterWidth = 150.0;
+    // Auvol.cpp reports -120 dBFS for digital silence.
+    constexpr double kSilenceDBFS = -90.0;
+
+    bool ParseDBFS(std::string const& value, double* dbfs)
+    {
+        if (value.empty()) return false;
+        try {
+            *dbfs = std::stod(value);
+            return true;
+        } catch (...) {
+            return false;
         }
     }
 
@@ -240,8 +258,7 @@ namespace winrt::Auvol::implementation
         }
 
         PeerIpTextBox().Text(winrt::to_hstring(peer));
-        SendModeButton().IsChecked(m_mode == 0);
-        ReceiveModeButton().IsChecked(m_mode == 1);
+        ApplyDirectionSelection();
         m_applyingAutoFollow = true;
         AutoFollowToggle().IsOn(settings.autoFollowEnabled);
         m_applyingAutoFollow = false;
@@ -284,16 +301,25 @@ namespace winrt::Auvol::implementation
         }
     }
 
-    void MainWindow::DirectionButton_Click(IInspectable const& sender,
-                                            RoutedEventArgs const&)
+    void MainWindow::DirectionSelector_SelectionChanged(
+        SelectorBar const&,
+        SelectorBarSelectionChangedEventArgs const&)
     {
-        m_mode = sender == ReceiveModeButton() ? 1 : 0;
-        SendModeButton().IsChecked(m_mode == 0);
-        ReceiveModeButton().IsChecked(m_mode == 1);
+        if (m_applyingDirection) return;
+        const int mode = DirectionSelector().SelectedItem() == ReceiveModeItem() ? 1 : 0;
+        if (mode == m_mode) return;
+        m_mode = mode;
         DeviceLabel().Text(m_mode == 0 ? L"采集设备" : L"播放设备");
         ResetStats();
         auvol::SwitchMode(m_mode);
         auvol::SaveSettings(PeerAddress(), m_mode, m_running);
+    }
+
+    void MainWindow::ApplyDirectionSelection()
+    {
+        m_applyingDirection = true;
+        DirectionSelector().SelectedItem(m_mode == 1 ? ReceiveModeItem() : SendModeItem());
+        m_applyingDirection = false;
     }
 
     void MainWindow::PeerIpTextBox_TextChanged(IInspectable const&,
@@ -350,8 +376,60 @@ namespace winrt::Auvol::implementation
         TransportInfoBar().Title(idle ? L"已暂停" : error ? L"传输错误" :
             recovering ? L"正在恢复" : L"已连接");
         TransportInfoBar().Message(winrt::to_hstring(LocalizedStatus(clean)));
-        ConnectionStateText().Text(idle ? L"空闲" : recovering ? L"正在恢复" :
-            error ? L"需要处理" : m_running ? L"运行中" : L"空闲");
+
+        if (recovering) {
+            ApplyStatePill(L"正在恢复",
+                           L"SystemFillColorCautionBrush",
+                           L"SystemFillColorCautionBackgroundBrush");
+        } else if (error) {
+            ApplyStatePill(L"需要处理",
+                           L"SystemFillColorCriticalBrush",
+                           L"SystemFillColorCriticalBackgroundBrush");
+        } else if (!idle && m_running) {
+            ApplyStatePill(L"运行中",
+                           L"SystemFillColorAttentionBrush",
+                           L"SystemFillColorAttentionBackgroundBrush");
+        } else {
+            ApplyStatePill(L"空闲",
+                           L"TextFillColorSecondaryBrush",
+                           L"SystemFillColorNeutralBackgroundBrush");
+        }
+    }
+
+    void MainWindow::ApplyStatePill(hstring const& text,
+                                    hstring const& fillKey,
+                                    hstring const& backgroundKey)
+    {
+        const auto resources = Application::Current().Resources();
+        const auto fill = resources.Lookup(winrt::box_value(fillKey)).as<Brush>();
+        ConnectionStateText().Text(text);
+        ConnectionStateText().Foreground(fill);
+        StateDot().Fill(fill);
+        StatePill().Background(
+            resources.Lookup(winrt::box_value(backgroundKey)).as<Brush>());
+    }
+
+    void MainWindow::ApplySignalLevel(std::string const& signal)
+    {
+        if (signal.empty()) {
+            SignalValue().Text(L"—");
+            SignalMeterFill().Width(0);
+            return;
+        }
+
+        double dbfs = 0;
+        if (!ParseDBFS(FirstToken(signal), &dbfs) || dbfs <= kSilenceDBFS) {
+            SignalValue().Text(L"静音");
+            SignalMeterFill().Width(0);
+            return;
+        }
+
+        char label[32] = {};
+        snprintf(label, sizeof(label), "%.1f dB", dbfs);
+        SignalValue().Text(winrt::to_hstring(label));
+        const double fraction = std::clamp(
+            (dbfs - kMeterFloorDBFS) / -kMeterFloorDBFS, 0.0, 1.0);
+        SignalMeterFill().Width(kMeterWidth * fraction);
     }
 
     void MainWindow::UpdateStats(std::string const& text)
@@ -362,13 +440,7 @@ namespace winrt::Auvol::implementation
         const auto lost = Trim(Metric(text, "Lost:"));
         const bool receiving = !render.empty();
 
-        if (signal.empty()) {
-            SignalValue().Text(L"—");
-        } else {
-            const auto token = FirstToken(signal);
-            SignalValue().Text(winrt::to_hstring(
-                token == "silent" || token == "Silent" ? "静音" : token));
-        }
+        ApplySignalLevel(signal);
 
         DeviceLabel().Text(receiving ? L"播放设备" : L"采集设备");
         DeviceValue().Text(m_deviceName.empty()
@@ -377,6 +449,7 @@ namespace winrt::Auvol::implementation
 
         if (!m_running) {
             QualityValue().Text(L"—");
+            SignalMeterFill().Width(0);
             return;
         }
 
@@ -400,10 +473,15 @@ namespace winrt::Auvol::implementation
         TransportButton().Content(winrt::box_value(
             running ? L"停止传输" : L"开始传输"));
         TransportButton().IsEnabled(running || PeerAddressIsValid());
-        ConnectionStateText().Text(running ? L"运行中" : L"空闲");
-        StateDot().Fill(Application::Current().Resources().Lookup(
-            winrt::box_value(running ? L"SystemFillColorSuccessBrush" :
-                                      L"TextFillColorTertiaryBrush")).as<Brush>());
+        if (running) {
+            ApplyStatePill(L"运行中",
+                           L"SystemFillColorAttentionBrush",
+                           L"SystemFillColorAttentionBackgroundBrush");
+        } else {
+            ApplyStatePill(L"空闲",
+                           L"TextFillColorSecondaryBrush",
+                           L"SystemFillColorNeutralBackgroundBrush");
+        }
         DeviceLabel().Text(m_mode == 0 ? L"采集设备" : L"播放设备");
         if (!running) ResetStats();
     }
@@ -411,8 +489,7 @@ namespace winrt::Auvol::implementation
     void MainWindow::UpdateMode(int mode)
     {
         m_mode = mode == 1 ? 1 : 0;
-        SendModeButton().IsChecked(m_mode == 0);
-        ReceiveModeButton().IsChecked(m_mode == 1);
+        ApplyDirectionSelection();
         DeviceLabel().Text(m_mode == 0 ? L"采集设备" : L"播放设备");
         ResetStats();
         auvol::SaveSettings(PeerAddress(), m_mode, m_running);
@@ -439,6 +516,7 @@ namespace winrt::Auvol::implementation
     void MainWindow::ResetStats()
     {
         SignalValue().Text(L"—");
+        SignalMeterFill().Width(0);
         QualityValue().Text(L"—");
         DeviceValue().Text(m_deviceName.empty()
             ? L"—"

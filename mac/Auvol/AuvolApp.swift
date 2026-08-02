@@ -37,15 +37,7 @@ private struct MenuBarStatusLabel: View {
     }
 
     private var menuBarImage: NSImage {
-        let color: NSColor
-        if engine.isPaused {
-            color = .systemOrange
-        } else if engine.isSending || engine.isPlaying {
-            color = .systemBlue
-        } else {
-            color = .systemRed
-        }
-
+        let color = TransportTone(engine).nsColor
         let configuration = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
             .applying(NSImage.SymbolConfiguration(paletteColors: [color]))
         guard let symbol = NSImage(systemSymbolName: "wave.3.forward",
@@ -73,14 +65,6 @@ private struct MenuBarStatusLabel: View {
 
     private var accessibilityLabel: String {
         let direction = engine.role == .send ? "Mac → Windows" : "Windows → Mac"
-        let status: String
-        if engine.isPaused {
-            status = "已暂停"
-        } else if engine.isSending || engine.isPlaying {
-            status = "已连接"
-        } else {
-            status = "有问题"
-        }
-        return "Auvol，\(direction)，\(status)"
+        return "Auvol，\(direction)，\(TransportTone(engine).label)"
     }
 }

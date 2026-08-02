@@ -161,18 +161,27 @@
                                            Style="{ThemeResource CaptionTextBlockStyle}"
                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                             </StackPanel>
-                            <StackPanel Grid.Column="2"
-                                        Orientation="Horizontal"
-                                        VerticalAlignment="Center"
-                                        Spacing="8">
-                                <Ellipse x:Name="StateDot"
-                                         Width="8"
-                                         Height="8"
-                                         Fill="{ThemeResource TextFillColorTertiaryBrush}" />
-                                <TextBlock x:Name="ConnectionStateText"
-                                           Text="空闲"
-                                           Style="{ThemeResource BodyStrongTextBlockStyle}" />
-                            </StackPanel>
+                            <Border x:Name="StatePill"
+                                    Grid.Column="2"
+                                    VerticalAlignment="Center"
+                                    CornerRadius="4"
+                                    Padding="10,4"
+                                    Background="{ThemeResource SystemFillColorNeutralBackgroundBrush}">
+                                <StackPanel Orientation="Horizontal"
+                                            VerticalAlignment="Center"
+                                            Spacing="8">
+                                    <Ellipse x:Name="StateDot"
+                                             Width="6"
+                                             Height="6"
+                                             VerticalAlignment="Center"
+                                             Fill="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock x:Name="ConnectionStateText"
+                                               Text="空闲"
+                                               Style="{ThemeResource CaptionTextBlockStyle}"
+                                               FontWeight="SemiBold"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                            </Border>
                         </Grid>
                     </Grid>
                 </Border>
@@ -210,33 +219,25 @@
                                 <TextBlock Text="传输方向"
                                            Style="{ThemeResource BodyStrongTextBlockStyle}" />
                             </StackPanel>
-                            <Grid Grid.Column="2" ColumnSpacing="8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <ToggleButton x:Name="SendModeButton"
-                                              Grid.Column="0"
-                                              MinWidth="148"
-                                              IsChecked="True"
-                                              Click="DirectionButton_Click"
-                                              AutomationProperties.AutomationId="SendToMac">
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <FontIcon Glyph="&#xE72A;" FontSize="16" />
-                                        <TextBlock Text="Windows → Mac" />
-                                    </StackPanel>
-                                </ToggleButton>
-                                <ToggleButton x:Name="ReceiveModeButton"
-                                              Grid.Column="1"
-                                              MinWidth="148"
-                                              Click="DirectionButton_Click"
-                                              AutomationProperties.AutomationId="ReceiveFromMac">
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <FontIcon Glyph="&#xE896;" FontSize="16" />
-                                        <TextBlock Text="Mac → Windows" />
-                                    </StackPanel>
-                                </ToggleButton>
-                            </Grid>
+                            <SelectorBar x:Name="DirectionSelector"
+                                         Grid.Column="2"
+                                         SelectionChanged="DirectionSelector_SelectionChanged">
+                                <SelectorBarItem x:Name="SendModeItem"
+                                                 Text="Windows → Mac"
+                                                 IsSelected="True"
+                                                 AutomationProperties.AutomationId="SendToMac">
+                                    <SelectorBarItem.Icon>
+                                        <FontIcon Glyph="&#xE72A;" />
+                                    </SelectorBarItem.Icon>
+                                </SelectorBarItem>
+                                <SelectorBarItem x:Name="ReceiveModeItem"
+                                                 Text="Mac → Windows"
+                                                 AutomationProperties.AutomationId="ReceiveFromMac">
+                                    <SelectorBarItem.Icon>
+                                        <FontIcon Glyph="&#xE896;" />
+                                    </SelectorBarItem.Icon>
+                                </SelectorBarItem>
+                            </SelectorBar>
                         </Grid>
 
                         <Border Grid.Row="1"
@@ -310,12 +311,30 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="信号"
                                        Style="{ThemeResource BodyTextBlockStyle}" />
+                            <Grid Grid.Column="1"
+                                  Width="150"
+                                  VerticalAlignment="Center">
+                                <Rectangle Height="4"
+                                           RadiusX="2"
+                                           RadiusY="2"
+                                           Fill="{ThemeResource CardStrokeColorDefaultBrush}" />
+                                <Rectangle x:Name="SignalMeterFill"
+                                           Width="0"
+                                           Height="4"
+                                           RadiusX="2"
+                                           RadiusY="2"
+                                           HorizontalAlignment="Left"
+                                           Fill="{ThemeResource AccentFillColorDefaultBrush}" />
+                            </Grid>
                             <TextBlock x:Name="SignalValue"
-                                       Grid.Column="1"
+                                       Grid.Column="2"
                                        Text="—"
+                                       MinWidth="76"
+                                       TextAlignment="Right"
                                        Style="{ThemeResource BodyStrongTextBlockStyle}" />
                         </Grid>
                         <Border Height="1"

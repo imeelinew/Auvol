@@ -10,8 +10,9 @@ namespace winrt::Auvol::implementation
 
         void TransportButton_Click(IInspectable const&,
                                    Microsoft::UI::Xaml::RoutedEventArgs const&);
-        void DirectionButton_Click(IInspectable const& sender,
-                                   Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void DirectionSelector_SelectionChanged(
+            Microsoft::UI::Xaml::Controls::SelectorBar const&,
+            Microsoft::UI::Xaml::Controls::SelectorBarSelectionChangedEventArgs const&);
         void PeerIpTextBox_TextChanged(IInspectable const&,
                                       Microsoft::UI::Xaml::Controls::TextChangedEventArgs const&);
         void AutoFollowToggle_Toggled(IInspectable const&,
@@ -24,6 +25,7 @@ namespace winrt::Auvol::implementation
         int m_mode = 0;
         bool m_running = false;
         bool m_applyingAutoFollow = false;
+        bool m_applyingDirection = false;
         std::string m_deviceName;
 
         void ConfigureWindow();
@@ -39,6 +41,11 @@ namespace winrt::Auvol::implementation
                               std::string const& currentOutputName,
                               bool currentOutputAvailable);
         void ResetStats();
+        void ApplyDirectionSelection();
+        void ApplyStatePill(hstring const& text,
+                            hstring const& fillKey,
+                            hstring const& backgroundKey);
+        void ApplySignalLevel(std::string const& signal);
         bool PeerAddressIsValid();
         std::string PeerAddress();
     };
