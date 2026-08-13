@@ -3,5 +3,14 @@
     <channel>
         <title>Auvol Updates</title>
         <language>en</language>
+        <item>
+            <title>0.2.1</title>
+            <pubDate>Thu, 13 Aug 2026 02:37:17 +0000</pubDate>
+            <link>https://github.com/imeelinew/Auvol</link>
+            <sparkle:version>1</sparkle:version>
+            <sparkle:shortVersionString>0.2.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.2</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/imeelinew/Auvol/releases/download/v0.2.1/Auvol-0.2.1.zip" length="3050167" type="application/octet-stream" sparkle:edSignature="RvTKNqSPqFzmikLYyP2PsaBorBGwmmLoLnDRP2DRqbYvWq1lXmSsMgIEL1BS77Nz0CGET4XFTCcqBts/+7ykCg=="/>
+        </item>
     </channel>
 </rss>
