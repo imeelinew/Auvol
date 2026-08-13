@@ -4,6 +4,7 @@ import SwiftUI
 @main
 struct AuvolApp: App {
     @StateObject private var engine: ReceiverEngine
+    @StateObject private var updateService = UpdateService()
 
     init() {
         let arguments = CommandLine.arguments
@@ -20,6 +21,7 @@ struct AuvolApp: App {
         MenuBarExtra {
             StatusView()
                 .environmentObject(engine)
+                .environmentObject(updateService)
         } label: {
             MenuBarStatusLabel(engine: engine)
         }

@@ -58,11 +58,13 @@ private enum Metrics {
 
 struct StatusView: View {
     @EnvironmentObject var engine: ReceiverEngine
+    @EnvironmentObject var updateService: UpdateService
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var peakDBFS = Metrics.meterFloorDBFS
     @State private var peakHoldTicks = 0
     @State private var quitHovering = false
+    @State private var updateHovering = false
 
     private var tone: TransportTone { TransportTone(engine) }
 
@@ -466,6 +468,15 @@ struct StatusView: View {
             .font(.system(size: 11.5))
             .foregroundStyle(quitHovering ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
             .onHover { quitHovering = $0 }
+
+            Button("检查更新") {
+                updateService.checkForUpdates()
+            }
+            .buttonStyle(.plain)
+            .font(.system(size: 11.5))
+            .foregroundStyle(updateHovering ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
+            .disabled(!updateService.canCheckForUpdates)
+            .onHover { updateHovering = $0 }
 
             Spacer(minLength: 8)
 

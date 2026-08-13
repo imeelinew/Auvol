@@ -20,6 +20,8 @@
 		D1C0A17C5A7E4E2A9B8C0001 /* DirectionControlChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1C0A17C5A7E4E2A9B8C0002 /* DirectionControlChannel.swift */; };
 		F3F4219AA07EADFC281A83AA /* Protocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49C17C025BD4D7601298E8AD /* Protocol.swift */; };
 		F44513EC89AF511DE3EB7F1A /* AuvolApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA12E08C31F6C24A1D730037 /* AuvolApp.swift */; };
+		SPA000000000000000000001 /* UpdateService.swift in Sources */ = {isa = PBXBuildFile; fileRef = SPA000000000000000000002 /* UpdateService.swift */; };
+		SPA000000000000000000003 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = SPA000000000000000000004 /* Sparkle */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,6 +42,7 @@
 		B0390DDC5801E29555F64454 /* SystemAudioSender.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SystemAudioSender.h; sourceTree = "<group>"; };
 		D55059006C0F9A1936D991AC /* Auvol-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Auvol-Bridging-Header.h"; sourceTree = "<group>"; };
 		DA12E08C31F6C24A1D730037 /* AuvolApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuvolApp.swift; sourceTree = "<group>"; };
+		SPA000000000000000000002 /* UpdateService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -70,6 +73,7 @@
 				5CA42E6CADBCAE40155EA99E /* AudioSender.swift */,
 				D55059006C0F9A1936D991AC /* Auvol-Bridging-Header.h */,
 				DA12E08C31F6C24A1D730037 /* AuvolApp.swift */,
+				SPA000000000000000000002 /* UpdateService.swift */,
 				D1C0A17C5A7E4E2A9B8C0002 /* DirectionControlChannel.swift */,
 				A7806FDEF4C10B34B2F11B2D /* NetworkPathMonitor.swift */,
 				0B252C4A09639EDD9CD76163 /* NetworkReceiver.swift */,
@@ -84,12 +88,24 @@
 		};
 /* End PBXGroup section */
 
+/* Begin PBXFrameworksBuildPhase section */
+		SPA0000000000000000000F1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				SPA000000000000000000003 /* Sparkle in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
 /* Begin PBXNativeTarget section */
 		9E2BDD4CE3F4E72873B0BA94 /* Auvol */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = B5F48412CB268F30EFA53C5D /* Build configuration list for PBXNativeTarget "Auvol" */;
 			buildPhases = (
 				FAE62F726C1DC825DF5E10D9 /* Sources */,
+				SPA0000000000000000000F1 /* Frameworks */,
 				C3E62D0223C882B991793FB3 /* Resources */,
 			);
 			buildRules = (
@@ -98,6 +114,7 @@
 			);
 			name = Auvol;
 			packageProductDependencies = (
+				SPA000000000000000000004 /* Sparkle */,
 			);
 			productName = Auvol;
 			productReference = 06C0F94AF7B3B427FFDE9EE2 /* Auvol.app */;
@@ -113,7 +130,7 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					9E2BDD4CE3F4E72873B0BA94 = {
-						DevelopmentTeam = "";
+						DevelopmentTeam = 5Q5QT76MJU;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -127,6 +144,9 @@
 			);
 			mainGroup = 7C5851E9A99E6C0D675A3789;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				SPA000000000000000000005 /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 2D186D185FD3048755E1557D /* Products */;
 			projectDirPath = "";
@@ -158,6 +178,7 @@
 				B20FD5FC7509D32F7012AB49 /* AudioRing.c in Sources */,
 				794E8F086EEE82C1C4918C2A /* AudioSender.swift in Sources */,
 				F44513EC89AF511DE3EB7F1A /* AuvolApp.swift in Sources */,
+				SPA000000000000000000001 /* UpdateService.swift in Sources */,
 				D1C0A17C5A7E4E2A9B8C0001 /* DirectionControlChannel.swift in Sources */,
 				AC4C4580F5CA3409338A4F16 /* NetworkPathMonitor.swift in Sources */,
 				CBAEFF17052D3CDD41A44656 /* NetworkReceiver.swift in Sources */,
@@ -220,12 +241,12 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 5Q5QT76MJU;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -305,12 +326,12 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 5Q5QT76MJU;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -356,6 +377,25 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		SPA000000000000000000005 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = exactVersion;
+				version = 2.9.5;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		SPA000000000000000000004 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = SPA000000000000000000005 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 3C20BB07AF99171F5A83F059 /* Project object */;
 }
