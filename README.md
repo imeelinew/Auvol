@@ -23,6 +23,7 @@
 
 <p align="center">
   <a href="https://github.com/imeelinew/Auvol/releases/latest"><img src="https://img.shields.io/github/v/release/imeelinew/Auvol" alt="Release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
   <img src="https://img.shields.io/badge/macOS-native-black" alt="macOS">
   <img src="https://img.shields.io/badge/Windows-WinUI%203-blue" alt="Windows WinUI 3">
   <img src="https://img.shields.io/badge/Swift-6-orange" alt="Swift 6">
@@ -119,3 +120,7 @@ WIN_HOST=eli-lan ./deploy.sh
 部署完成后，新的 Windows 应用会自动启动。日常使用中，设备切换与短暂音频故障会自动恢复。ALV1 与 ALV2 故意不兼容。
 
 更细的协议说明见 [`PROTOCOL.md`](PROTOCOL.md)。
+
+## 许可
+
+本项目采用 [MIT License](LICENSE)。
