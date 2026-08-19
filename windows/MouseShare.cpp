@@ -308,7 +308,6 @@ void HideSystemCursor() {
 }
 
 void RestoreSystemCursor() {
-    if (!g_cursorHidden) return;
     SystemParametersInfoW(SPI_SETCURSORS, 0, nullptr, 0);
     g_cursorHidden = false;
 }
@@ -852,6 +851,7 @@ void StartMouseShare(const std::string& peerIP) {
         EnsureStateLocked();
         if (g_running.exchange(true, std::memory_order_acq_rel)) return;
     }
+    RestoreSystemCursor();
     if (g_udpThread.joinable()) g_udpThread.join();
     if (g_messageThread.joinable()) g_messageThread.join();
     g_udpThread = std::thread(UdpThread);

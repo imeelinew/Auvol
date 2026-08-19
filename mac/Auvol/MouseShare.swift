@@ -76,8 +76,21 @@ final class MouseShareController: ObservableObject {
     private var cursorHidden = false
     private var lastPhysicalEvent = Date.distantPast
     private var injectLocation = CGPoint.zero
+    private var launchFinished = false
+    private var captureArmed = false
+    private var armGlobalMonitor: Any?
+    private var armLocalMonitor: Any?
+    private var launchObserver: NSObjectProtocol?
+    private var terminateObserver: NSObjectProtocol?
+
+    static func restoreSystemPointerState() {
+        // Session-wide: a previous force-quit can leave the pointer detached.
+        CGAssociateMouseAndMouseCursorPosition(boolean_t(1))
+        CGDisplayShowCursor(CGMainDisplayID())
+    }
 
     init(peerIP: String) {
+        Self.restoreSystemPointerState()
         let defaults = UserDefaults.standard
         let savedCode = defaults.object(forKey: Self.hotkeyKeyCodeKey) as? Int
         let savedFlags = defaults.integer(forKey: Self.hotkeyFlagsKey)
@@ -101,19 +114,45 @@ final class MouseShareController: ObservableObject {
         channel.onEvent = { [weak self] event in
             self?.inject(event)
         }
-        if let error = channel.start() {
-            NSLog("Auvol mouse channel: %@", error)
-        }
         installHotkeyMonitors()
         refreshPermission()
-        if enabled { startTap() }
         startPermissionTimer()
+        launchObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didFinishLaunchingNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handleLaunch()
+        }
+        terminateObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            MouseShareController.restoreSystemPointerState()
+        }
+        DispatchQueue.main.async { [weak self] in
+            self?.handleLaunch()
+        }
+    }
+
+    deinit {
+        stop()
     }
 
     func stop() {
         permissionTimer?.invalidate()
         permissionTimer = nil
         stopTap()
+        removeArmMonitors()
+        if let launchObserver {
+            NotificationCenter.default.removeObserver(launchObserver)
+            self.launchObserver = nil
+        }
+        if let terminateObserver {
+            NotificationCenter.default.removeObserver(terminateObserver)
+            self.terminateObserver = nil
+        }
         if let globalMonitor { NSEvent.removeMonitor(globalMonitor) }
         if let localMonitor { NSEvent.removeMonitor(localMonitor) }
         globalMonitor = nil
@@ -130,6 +169,9 @@ final class MouseShareController: ObservableObject {
         if value { promptPermissionIfNeeded() }
         enabled = value
         publish()
+        DispatchQueue.main.async { [weak self] in
+            self?.armCapture()
+        }
         refreshInput()
     }
 
@@ -137,6 +179,9 @@ final class MouseShareController: ObservableObject {
         guard !applyingRemote, cursorHost != host else { return }
         cursorHost = host
         publish()
+        DispatchQueue.main.async { [weak self] in
+            self?.armCapture()
+        }
         refreshInput()
     }
 
@@ -161,9 +206,47 @@ final class MouseShareController: ObservableObject {
         refreshInput()
     }
 
+    private func handleLaunch() {
+        guard !launchFinished else { return }
+        launchFinished = true
+        Self.restoreSystemPointerState()
+        if let error = channel.start() {
+            NSLog("Auvol mouse channel: %@", error)
+        }
+        installArmMonitor()
+        refreshInput()
+    }
+
+    private func installArmMonitor() {
+        guard !captureArmed else { return }
+        let mask: NSEvent.EventTypeMask = [.leftMouseUp, .rightMouseUp, .otherMouseUp]
+        armGlobalMonitor = NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] _ in
+            DispatchQueue.main.async { self?.armCapture() }
+        }
+        armLocalMonitor = NSEvent.addLocalMonitorForEvents(matching: mask) { [weak self] event in
+            DispatchQueue.main.async { self?.armCapture() }
+            return event
+        }
+    }
+
+    private func removeArmMonitors() {
+        if let armGlobalMonitor { NSEvent.removeMonitor(armGlobalMonitor) }
+        if let armLocalMonitor { NSEvent.removeMonitor(armLocalMonitor) }
+        armGlobalMonitor = nil
+        armLocalMonitor = nil
+    }
+
+    private func armCapture() {
+        guard !captureArmed else { return }
+        captureArmed = true
+        removeArmMonitors()
+        refreshInput()
+    }
+
     private func refreshInput() {
         refreshPermission()
-        if enabled { startTap() } else { stopTap() }
+        let shouldTap = launchFinished && captureArmed && enabled && cursorHost != .mac
+        if shouldTap { startTap() } else { stopTap() }
         updateCursorVisibility()
     }
 
@@ -184,7 +267,7 @@ final class MouseShareController: ObservableObject {
             let trusted = AXIsProcessTrusted()
             if trusted != !self.needsPermission {
                 self.needsPermission = !trusted
-                if trusted { self.startTap() }
+                if trusted { self.refreshInput() }
             }
         }
     }
@@ -231,6 +314,7 @@ final class MouseShareController: ObservableObject {
     private func stopTap() {
         if let tap {
             CGEvent.tapEnable(tap: tap, enable: false)
+            CFMachPortInvalidate(tap)
         }
         if let tapSource {
             CFRunLoopRemoveSource(CFRunLoopGetMain(), tapSource, .commonModes)
@@ -248,12 +332,12 @@ final class MouseShareController: ObservableObject {
         if event.getIntegerValueField(.eventSourceUserData) == Self.magic {
             return Unmanaged.passUnretained(event)
         }
-        guard enabled else { return Unmanaged.passUnretained(event) }
+        guard enabled, captureArmed, cursorHost != .mac else {
+            return Unmanaged.passUnretained(event)
+        }
         lastPhysicalEvent = Date()
         updateButtons(type: type, event: event)
-        let forwarding = cursorHost != .mac
         updateCursorVisibility()
-        guard forwarding else { return Unmanaged.passUnretained(event) }
         let dx = Int16(clamping: event.getIntegerValueField(.mouseEventDeltaX))
         let dy = Int16(clamping: event.getIntegerValueField(.mouseEventDeltaY))
         var wheel: Int16 = 0
@@ -371,9 +455,9 @@ final class MouseShareController: ObservableObject {
     }
 
     private func updateCursorVisibility() {
-        let hide = enabled && cursorHost != .mac && Date().timeIntervalSince(lastPhysicalEvent) < 0.8
+        let hide = enabled && captureArmed && cursorHost != .mac
+            && Date().timeIntervalSince(lastPhysicalEvent) < 0.8
         if hide, !cursorHidden {
-            CGAssociateMouseAndMouseCursorPosition(boolean_t(0))
             CGDisplayHideCursor(CGMainDisplayID())
             cursorHidden = true
         } else if !hide, cursorHidden {
@@ -382,11 +466,8 @@ final class MouseShareController: ObservableObject {
     }
 
     private func restoreCursor() {
-        if cursorHidden {
-            CGAssociateMouseAndMouseCursorPosition(boolean_t(1))
-            CGDisplayShowCursor(CGMainDisplayID())
-            cursorHidden = false
-        }
+        Self.restoreSystemPointerState()
+        cursorHidden = false
     }
 
     private func installHotkeyMonitors() {
