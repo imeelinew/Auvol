@@ -52,6 +52,17 @@ targets:
         NSBonjourServices:
           - "_auvol._udp."
         LSApplicationCategoryType: public.app-category.utilities
+        SUEnableAutomaticChecks: true
+        SUFeedURL: https://imeelinew.github.io/Auvol/appcast.xml
+        SUPublicEDKey: 4r6yMauRlw+aLLxSMfyZqTLD4OTPOizEzu1hKRf9wUI=
+        SUScheduledCheckInterval: 86400
+    dependencies:
+      - package: Sparkle
+
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.9.5
 
 schemes:
   Auvol:

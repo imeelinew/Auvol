@@ -9,22 +9,25 @@
 /* Begin PBXBuildFile section */
 		3BD0BD0AD7D750EBD7E93BF4 /* ReceiverEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6833A9BAD43D712DCD5AFF0B /* ReceiverEngine.swift */; };
 		45A1FF540998FC5989CCD839 /* AudioOutputRouteMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FF93CF7280B83BEB6678843 /* AudioOutputRouteMonitor.swift */; };
+		4AE3C119FD24E0E314AEFF63 /* MouseShare.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01269082EB709752A1D01F81 /* MouseShare.swift */; };
 		4CF88C6FC8E2731B77A9D69F /* SystemAudioSender.m in Sources */ = {isa = PBXBuildFile; fileRef = 2DD94B8398183BAC3DB15A9F /* SystemAudioSender.m */; };
+		732A8278E3771C825209568F /* UpdateService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 917AF27C5E5FAD481F093A35 /* UpdateService.swift */; };
 		753AF5C00AC47DCA52011428 /* AudioPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 693C245EAE0EB2F9B5B5A327 /* AudioPlayer.swift */; };
 		794E8F086EEE82C1C4918C2A /* AudioSender.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CA42E6CADBCAE40155EA99E /* AudioSender.swift */; };
 		80E033D97D17CB0969011B6D /* StatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC4D22BBDDD4CB58C502FC1A /* StatusView.swift */; };
 		AC4C4580F5CA3409338A4F16 /* NetworkPathMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7806FDEF4C10B34B2F11B2D /* NetworkPathMonitor.swift */; };
+		AE7D5166D6773449597D0244 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 1529F6C2F46925F5645EA573 /* Sparkle */; };
+		B0389F737E8B15F84E4CC42C /* MouseControlChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61A35671B0ADB97163DBAD30 /* MouseControlChannel.swift */; };
 		B20FD5FC7509D32F7012AB49 /* AudioRing.c in Sources */ = {isa = PBXBuildFile; fileRef = 7766717944A0BFD3082C1E30 /* AudioRing.c */; };
 		C192A35282280B2528EA5E49 /* Auvol.icon in Resources */ = {isa = PBXBuildFile; fileRef = 4BF7B13D14D2F171F15418B7 /* Auvol.icon */; };
 		CBAEFF17052D3CDD41A44656 /* NetworkReceiver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B252C4A09639EDD9CD76163 /* NetworkReceiver.swift */; };
-		D1C0A17C5A7E4E2A9B8C0001 /* DirectionControlChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1C0A17C5A7E4E2A9B8C0002 /* DirectionControlChannel.swift */; };
+		DB230E281B1B7B2ABE835AB2 /* DirectionControlChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82E6358ECC3572766A8AEAA8 /* DirectionControlChannel.swift */; };
 		F3F4219AA07EADFC281A83AA /* Protocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49C17C025BD4D7601298E8AD /* Protocol.swift */; };
 		F44513EC89AF511DE3EB7F1A /* AuvolApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA12E08C31F6C24A1D730037 /* AuvolApp.swift */; };
-		SPA000000000000000000001 /* UpdateService.swift in Sources */ = {isa = PBXBuildFile; fileRef = SPA000000000000000000002 /* UpdateService.swift */; };
-		SPA000000000000000000003 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = SPA000000000000000000004 /* Sparkle */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		01269082EB709752A1D01F81 /* MouseShare.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseShare.swift; sourceTree = "<group>"; };
 		06C0F94AF7B3B427FFDE9EE2 /* Auvol.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Auvol.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		0B252C4A09639EDD9CD76163 /* NetworkReceiver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkReceiver.swift; sourceTree = "<group>"; };
 		1FF93CF7280B83BEB6678843 /* AudioOutputRouteMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioOutputRouteMonitor.swift; sourceTree = "<group>"; };
@@ -32,18 +35,30 @@
 		49C17C025BD4D7601298E8AD /* Protocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Protocol.swift; sourceTree = "<group>"; };
 		4BF7B13D14D2F171F15418B7 /* Auvol.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = Auvol.icon; sourceTree = "<group>"; };
 		5CA42E6CADBCAE40155EA99E /* AudioSender.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSender.swift; sourceTree = "<group>"; };
+		61A35671B0ADB97163DBAD30 /* MouseControlChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseControlChannel.swift; sourceTree = "<group>"; };
 		6833A9BAD43D712DCD5AFF0B /* ReceiverEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiverEngine.swift; sourceTree = "<group>"; };
 		693C245EAE0EB2F9B5B5A327 /* AudioPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlayer.swift; sourceTree = "<group>"; };
 		7766717944A0BFD3082C1E30 /* AudioRing.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = AudioRing.c; sourceTree = "<group>"; };
-		D1C0A17C5A7E4E2A9B8C0002 /* DirectionControlChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectionControlChannel.swift; sourceTree = "<group>"; };
+		82E6358ECC3572766A8AEAA8 /* DirectionControlChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectionControlChannel.swift; sourceTree = "<group>"; };
 		909DF5FA8150044F93B5A21D /* AudioRing.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AudioRing.h; sourceTree = "<group>"; };
+		917AF27C5E5FAD481F093A35 /* UpdateService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateService.swift; sourceTree = "<group>"; };
 		A7806FDEF4C10B34B2F11B2D /* NetworkPathMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkPathMonitor.swift; sourceTree = "<group>"; };
 		AC4D22BBDDD4CB58C502FC1A /* StatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusView.swift; sourceTree = "<group>"; };
 		B0390DDC5801E29555F64454 /* SystemAudioSender.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SystemAudioSender.h; sourceTree = "<group>"; };
 		D55059006C0F9A1936D991AC /* Auvol-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Auvol-Bridging-Header.h"; sourceTree = "<group>"; };
 		DA12E08C31F6C24A1D730037 /* AuvolApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuvolApp.swift; sourceTree = "<group>"; };
-		SPA000000000000000000002 /* UpdateService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		B6623435662E97F7A1BCD6EB /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AE7D5166D6773449597D0244 /* Sparkle in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		2D186D185FD3048755E1557D /* Products */ = {
@@ -73,8 +88,9 @@
 				5CA42E6CADBCAE40155EA99E /* AudioSender.swift */,
 				D55059006C0F9A1936D991AC /* Auvol-Bridging-Header.h */,
 				DA12E08C31F6C24A1D730037 /* AuvolApp.swift */,
-				SPA000000000000000000002 /* UpdateService.swift */,
-				D1C0A17C5A7E4E2A9B8C0002 /* DirectionControlChannel.swift */,
+				82E6358ECC3572766A8AEAA8 /* DirectionControlChannel.swift */,
+				61A35671B0ADB97163DBAD30 /* MouseControlChannel.swift */,
+				01269082EB709752A1D01F81 /* MouseShare.swift */,
 				A7806FDEF4C10B34B2F11B2D /* NetworkPathMonitor.swift */,
 				0B252C4A09639EDD9CD76163 /* NetworkReceiver.swift */,
 				49C17C025BD4D7601298E8AD /* Protocol.swift */,
@@ -82,22 +98,12 @@
 				AC4D22BBDDD4CB58C502FC1A /* StatusView.swift */,
 				B0390DDC5801E29555F64454 /* SystemAudioSender.h */,
 				2DD94B8398183BAC3DB15A9F /* SystemAudioSender.m */,
+				917AF27C5E5FAD481F093A35 /* UpdateService.swift */,
 			);
 			path = Auvol;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
-
-/* Begin PBXFrameworksBuildPhase section */
-		SPA0000000000000000000F1 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				SPA000000000000000000003 /* Sparkle in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXNativeTarget section */
 		9E2BDD4CE3F4E72873B0BA94 /* Auvol */ = {
@@ -105,8 +111,8 @@
 			buildConfigurationList = B5F48412CB268F30EFA53C5D /* Build configuration list for PBXNativeTarget "Auvol" */;
 			buildPhases = (
 				FAE62F726C1DC825DF5E10D9 /* Sources */,
-				SPA0000000000000000000F1 /* Frameworks */,
 				C3E62D0223C882B991793FB3 /* Resources */,
+				B6623435662E97F7A1BCD6EB /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -114,7 +120,7 @@
 			);
 			name = Auvol;
 			packageProductDependencies = (
-				SPA000000000000000000004 /* Sparkle */,
+				1529F6C2F46925F5645EA573 /* Sparkle */,
 			);
 			productName = Auvol;
 			productReference = 06C0F94AF7B3B427FFDE9EE2 /* Auvol.app */;
@@ -130,7 +136,7 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					9E2BDD4CE3F4E72873B0BA94 = {
-						DevelopmentTeam = 5Q5QT76MJU;
+						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -145,7 +151,7 @@
 			mainGroup = 7C5851E9A99E6C0D675A3789;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				SPA000000000000000000005 /* XCRemoteSwiftPackageReference "Sparkle" */,
+				AEFA510A5F3221FA27A8E157 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 2D186D185FD3048755E1557D /* Products */;
@@ -178,14 +184,16 @@
 				B20FD5FC7509D32F7012AB49 /* AudioRing.c in Sources */,
 				794E8F086EEE82C1C4918C2A /* AudioSender.swift in Sources */,
 				F44513EC89AF511DE3EB7F1A /* AuvolApp.swift in Sources */,
-				SPA000000000000000000001 /* UpdateService.swift in Sources */,
-				D1C0A17C5A7E4E2A9B8C0001 /* DirectionControlChannel.swift in Sources */,
+				DB230E281B1B7B2ABE835AB2 /* DirectionControlChannel.swift in Sources */,
+				B0389F737E8B15F84E4CC42C /* MouseControlChannel.swift in Sources */,
+				4AE3C119FD24E0E314AEFF63 /* MouseShare.swift in Sources */,
 				AC4C4580F5CA3409338A4F16 /* NetworkPathMonitor.swift in Sources */,
 				CBAEFF17052D3CDD41A44656 /* NetworkReceiver.swift in Sources */,
 				F3F4219AA07EADFC281A83AA /* Protocol.swift in Sources */,
 				3BD0BD0AD7D750EBD7E93BF4 /* ReceiverEngine.swift in Sources */,
 				80E033D97D17CB0969011B6D /* StatusView.swift in Sources */,
 				4CF88C6FC8E2731B77A9D69F /* SystemAudioSender.m in Sources */,
+				732A8278E3771C825209568F /* UpdateService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -202,7 +210,6 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.2.1;
 				SDKROOT = macosx;
 				SWIFT_OBJC_BRIDGING_HEADER = "Auvol/Auvol-Bridging-Header.h";
 			};
@@ -241,12 +248,12 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = 5Q5QT76MJU;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -264,7 +271,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.2;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -287,7 +294,6 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.2.1;
 				SDKROOT = macosx;
 				SWIFT_OBJC_BRIDGING_HEADER = "Auvol/Auvol-Bridging-Header.h";
 			};
@@ -326,12 +332,12 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = 5Q5QT76MJU;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -343,7 +349,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.2;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.eli.Auvol;
@@ -379,7 +385,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		SPA000000000000000000005 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+		AEFA510A5F3221FA27A8E157 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/sparkle-project/Sparkle";
 			requirement = {
@@ -390,9 +396,9 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		SPA000000000000000000004 /* Sparkle */ = {
+		1529F6C2F46925F5645EA573 /* Sparkle */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = SPA000000000000000000005 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			package = AEFA510A5F3221FA27A8E157 /* XCRemoteSwiftPackageReference "Sparkle" */;
 			productName = Sparkle;
 		};
 /* End XCSwiftPackageProductDependency section */

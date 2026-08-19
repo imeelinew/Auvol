@@ -1,3 +1,4 @@
+import Combine
 import CoreAudio
 import Foundation
 import OSLog
@@ -58,6 +59,9 @@ final class ReceiverEngine: ObservableObject {
     @Published private(set) var currentSystemOutputName = ""
     @Published private(set) var currentSystemOutputIsBluetooth = false
     @Published private(set) var networkPathName = NetworkPathKind.fallback.title
+
+    let mouseShare: MouseShareController
+    private var mouseShareCancellable: AnyCancellable?
 
     private let logger = Logger(subsystem: "com.eli.Auvol", category: "stream")
     private let metricsLock = NSLock()
@@ -126,6 +130,7 @@ final class ReceiverEngine: ObservableObject {
         activePeerIP = savedPeerIP
         activeLocalIP = nil
         networkPathMonitor = NetworkPathMonitor(fallbackPeerIP: savedPeerIP)
+        mouseShare = MouseShareController(peerIP: savedPeerIP)
         autoFollowEnabled = UserDefaults.standard.bool(forKey: Self.autoFollowKey)
         followedOutputUID = UserDefaults.standard.string(
             forKey: Self.followedOutputUIDKey
@@ -160,6 +165,9 @@ final class ReceiverEngine: ObservableObject {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.activate(self.initialRole)
+        }
+        mouseShareCancellable = mouseShare.objectWillChange.sink { [weak self] _ in
+            DispatchQueue.main.async { self?.objectWillChange.send() }
         }
     }
 
@@ -251,8 +259,10 @@ final class ReceiverEngine: ObservableObject {
         if activeLocalIP == nil {
             activePeerIP = value
             directionControl?.setPeerIP(value)
+            mouseShare.setPeerIP(value)
         } else {
             directionControl?.setPeerIP(activePeerIP)
+            mouseShare.setPeerIP(activePeerIP)
         }
         peerChangeWorkItem?.cancel()
         guard role == .send, !isPaused, activeLocalIP == nil else { return }
@@ -473,6 +483,8 @@ final class ReceiverEngine: ObservableObject {
         networkPathName = selection.kind.title
         directionControl?.setLocalIP(selection.localIP)
         directionControl?.setPeerIP(activePeerIP)
+        mouseShare.setLocalIP(selection.localIP)
+        mouseShare.setPeerIP(activePeerIP)
         guard changed, role == .send, !isPaused else { return }
         beginRecovery("Network path changed", expectedGeneration: currentGeneration())
     }
@@ -829,6 +841,7 @@ final class ReceiverEngine: ObservableObject {
         peerChangeWorkItem?.cancel()
         statsTimer?.invalidate()
         directionControl?.stop()
+        mouseShare.stop()
         networkPathMonitor.stop()
         outputRouteMonitor.stop()
         network?.stop()

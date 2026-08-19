@@ -76,6 +76,7 @@ struct StatusView: View {
             }
             directionPicker
             controlCard
+            mouseCard
             statusCard
             footer
         }
@@ -375,6 +376,103 @@ struct StatusView: View {
             .font(.system(size: 11.5, design: .monospaced))
             .frame(width: 138)
         }
+    }
+
+    // MARK: - Mouse share
+
+    private var mouseCard: some View {
+        Card {
+            row(icon: "computermouse",
+                title: "鼠标接管",
+                tinted: engine.mouseShare.enabled) {
+                Toggle("", isOn: Binding(
+                    get: { engine.mouseShare.enabled },
+                    set: { engine.mouseShare.setEnabled($0) }
+                ))
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                .labelsHidden()
+            }
+            if engine.mouseShare.enabled {
+                RowSeparator()
+                row(icon: "cursorarrow", title: "光标位置") {
+                    HStack(spacing: 2) {
+                        mouseHostSegment(.mac, "Mac")
+                        mouseHostSegment(.windows, "Windows")
+                    }
+                    .padding(2)
+                    .background(
+                        Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.085),
+                        in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    )
+                }
+                RowSeparator()
+                row(icon: "keyboard", title: "切换快捷键") {
+                    HStack(spacing: 8) {
+                        Text(engine.mouseShare.capturingHotkey
+                             ? "按下新快捷键…"
+                             : engine.mouseShare.hotkey.display)
+                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(
+                                Color.primary.opacity(colorScheme == .dark ? 0.09 : 0.055),
+                                in: RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            )
+                        Button(engine.mouseShare.capturingHotkey ? "取消" : "更改") {
+                            if engine.mouseShare.capturingHotkey {
+                                engine.mouseShare.cancelHotkeyCapture()
+                            } else {
+                                engine.mouseShare.beginHotkeyCapture()
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 10.5, weight: .medium))
+                        .foregroundStyle(Color.accentColor)
+                    }
+                }
+                if engine.mouseShare.needsPermission {
+                    RowSeparator()
+                    HStack(alignment: .top, spacing: 7) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 10))
+                        Text("需要辅助功能权限才能截获和注入鼠标。")
+                            .font(.system(size: 11))
+                            .fixedSize(horizontal: false, vertical: true)
+                        Button("打开设置") {
+                            engine.mouseShare.openAccessibilitySettings()
+                        }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundStyle(Color.red)
+                    .padding(.horizontal, Metrics.rowInset)
+                    .padding(.vertical, 7)
+                }
+            }
+        }
+    }
+
+    private func mouseHostSegment(_ host: CursorHost, _ title: String) -> some View {
+        let selected = engine.mouseShare.cursorHost == host
+        return Button {
+            engine.mouseShare.setCursorHost(host)
+        } label: {
+            Text(title)
+                .font(.system(size: 11, weight: selected ? .semibold : .regular))
+                .foregroundStyle(selected ? Color.primary : Color.secondary)
+                .padding(.horizontal, 9)
+                .frame(height: 22)
+                .background {
+                    if selected {
+                        RoundedRectangle(cornerRadius: 5.5, style: .continuous)
+                            .fill(raisedFill)
+                            .shadow(color: .black.opacity(0.16), radius: 1, y: 0.5)
+                    }
+                }
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Status

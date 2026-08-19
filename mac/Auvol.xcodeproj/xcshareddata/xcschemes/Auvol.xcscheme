@@ -55,7 +55,6 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "9E2BDD4CE3F4E72873B0BA94"
             BuildableName = "Auvol.app"
-            BlueprintName = "Auvol"
             ReferencedContainer = "container:Auvol.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>

@@ -43,4 +43,18 @@ void SwitchMode(int mode);
 bool IsRunning();
 void Shutdown();
 
+using MouseShareCallback = std::function<void(bool enabled,
+                                              int cursorHost,
+                                              bool capturingHotkey,
+                                              std::wstring hotkeyDisplay)>;
+void SetMouseShareCallback(MouseShareCallback callback);
+void StartMouseShare(const std::string& peerIP);
+void SetMouseSharePeer(const std::string& peerIP);
+void SetMouseShareEndpoint(const std::string& peerIP, const std::string& localIP);
+void SetMouseShareEnabled(bool enabled);
+void SetMouseCursorHost(int host);
+void BeginMouseHotkeyCapture();
+void CancelMouseHotkeyCapture();
+void StopMouseShare();
+
 } // namespace auvol

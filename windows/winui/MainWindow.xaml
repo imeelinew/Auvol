@@ -39,6 +39,8 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <StackPanel Grid.Row="0" Spacing="4" Margin="0,0,0,28">
@@ -281,11 +283,125 @@
                          Message="选择方向后开始传输" />
 
                 <TextBlock Grid.Row="6"
-                           Text="状态"
+                           Text="鼠标接管"
                            Style="{ThemeResource SubtitleTextBlockStyle}"
                            Margin="0,0,0,12" />
 
                 <Border Grid.Row="7"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Margin="0,0,0,28">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <Grid Padding="16" ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE962;"
+                                      FontSize="20"
+                                      VerticalAlignment="Center"
+                                      Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <TextBlock Grid.Column="1"
+                                       Text="鼠标接管"
+                                       VerticalAlignment="Center"
+                                       Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                            <ToggleSwitch x:Name="MouseShareToggle"
+                                          Grid.Column="2"
+                                          OffContent="关"
+                                          OnContent="开"
+                                          Toggled="MouseShareToggle_Toggled"
+                                          AutomationProperties.AutomationId="MouseShare" />
+                        </Grid>
+
+                        <Grid x:Name="MouseCursorRow"
+                              Grid.Row="1"
+                              Padding="16"
+                              ColumnSpacing="16"
+                              Visibility="Collapsed"
+                              BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                              BorderThickness="0,1,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE8B0;"
+                                      FontSize="20"
+                                      VerticalAlignment="Center"
+                                      Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <TextBlock Grid.Column="1"
+                                       Text="光标位置"
+                                       VerticalAlignment="Center"
+                                       Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                            <SelectorBar x:Name="CursorHostSelector"
+                                         Grid.Column="2"
+                                         SelectionChanged="CursorHostSelector_SelectionChanged">
+                                <SelectorBarItem x:Name="CursorMacItem"
+                                                 Text="Mac"
+                                                 AutomationProperties.AutomationId="CursorMac" />
+                                <SelectorBarItem x:Name="CursorWindowsItem"
+                                                 Text="Windows"
+                                                 IsSelected="True"
+                                                 AutomationProperties.AutomationId="CursorWindows" />
+                            </SelectorBar>
+                        </Grid>
+
+                        <Grid x:Name="MouseHotkeyRow"
+                              Grid.Row="2"
+                              Padding="16"
+                              ColumnSpacing="16"
+                              Visibility="Collapsed"
+                              BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                              BorderThickness="0,1,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE92E;"
+                                      FontSize="20"
+                                      VerticalAlignment="Center"
+                                      Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <TextBlock Grid.Column="1"
+                                       Text="切换快捷键"
+                                       VerticalAlignment="Center"
+                                       Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                            <StackPanel Grid.Column="2"
+                                        Orientation="Horizontal"
+                                        VerticalAlignment="Center"
+                                        Spacing="10">
+                                <Border Padding="8,4"
+                                        CornerRadius="4"
+                                        Background="{ThemeResource ControlFillColorDefaultBrush}">
+                                    <TextBlock x:Name="MouseHotkeyText"
+                                               Text="Ctrl + Alt + M"
+                                               FontFamily="Cascadia Mono"
+                                               Style="{ThemeResource CaptionTextBlockStyle}" />
+                                </Border>
+                                <Button x:Name="MouseHotkeyButton"
+                                        Content="更改"
+                                        Click="MouseHotkeyButton_Click"
+                                        AutomationProperties.AutomationId="MouseHotkeyChange" />
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <TextBlock Grid.Row="8"
+                           Text="状态"
+                           Style="{ThemeResource SubtitleTextBlockStyle}"
+                           Margin="0,0,0,12" />
+
+                <Border Grid.Row="9"
                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                         BorderThickness="1"

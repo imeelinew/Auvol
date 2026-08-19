@@ -492,6 +492,8 @@ static void ApplyNetworkPath(auvol::NetworkPathSelection selection) {
         std::lock_guard<std::mutex> lock(g_directionMutex);
         g_directionPeerIP = selection.peerIP;
     }
+    auvol::SetMouseShareEndpoint(selection.peerIP,
+                                 selection.wired ? selection.localIP : std::string());
     if (!changed) return;
 
     char status[192] = {};
@@ -2409,6 +2411,7 @@ void Shutdown() {
         g_autoMonitorEvent = nullptr;
     }
     StopDirectionControl();
+    StopMouseShare();
     {
         std::lock_guard<std::mutex> lock(g_callbackMutex);
         g_statusCallback = {};

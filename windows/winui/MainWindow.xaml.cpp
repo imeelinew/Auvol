@@ -8,6 +8,8 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <string>
+#include <string_view>
 
 using namespace winrt::Microsoft::UI::Xaml;
 using namespace winrt::Microsoft::UI::Xaml::Controls;
@@ -171,7 +173,7 @@ namespace winrt::Auvol::implementation
         const UINT dpi = GetDpiForWindow(m_hwnd);
         const double scale = static_cast<double>(dpi) / 96.0;
         const int width = static_cast<int>(760 * scale);
-        const int height = static_cast<int>(880 * scale);
+        const int height = static_cast<int>(1040 * scale);
         SetWindowPos(m_hwnd, nullptr, 0, 0, width, height,
                      SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
 
@@ -242,6 +244,22 @@ namespace winrt::Auvol::implementation
                     }
                 });
             });
+        auvol::SetMouseShareCallback(
+            [dispatcher, weak](bool enabled, int cursorHost, bool capturing,
+                               std::wstring hotkeyDisplay) {
+                dispatcher.TryEnqueue([
+                    weak,
+                    enabled,
+                    cursorHost,
+                    capturing,
+                    hotkeyDisplay = std::move(hotkeyDisplay)
+                ] {
+                    if (const auto self = weak.get()) {
+                        self->UpdateMouseShare(enabled, cursorHost, capturing,
+                                               hotkeyDisplay);
+                    }
+                });
+            });
     }
 
     void MainWindow::ApplyInitialSettings()
@@ -270,6 +288,7 @@ namespace winrt::Auvol::implementation
         DeviceValue().Text(L"—");
         auvol::StartDirectionControl(peer);
         auvol::StartAutoDirectionMonitor();
+        auvol::StartMouseShare(peer);
 
         if ((!commandPeer.empty() || settings.running) && PeerAddressIsValid()) {
             auvol::Start(PeerAddress(), m_mode);
@@ -327,6 +346,7 @@ namespace winrt::Auvol::implementation
     {
         if (PeerAddressIsValid()) {
             auvol::SetDirectionControlPeer(PeerAddress());
+            auvol::SetMouseSharePeer(PeerAddress());
         }
         if (!m_running) {
             TransportButton().IsEnabled(PeerAddressIsValid());
@@ -511,6 +531,51 @@ namespace winrt::Auvol::implementation
             ? L"—"
             : winrt::to_hstring(m_deviceName));
         UseCurrentOutputButton().IsEnabled(currentOutputAvailable);
+    }
+
+    void MainWindow::MouseShareToggle_Toggled(IInspectable const&,
+                                              RoutedEventArgs const&)
+    {
+        if (m_applyingMouseShare) return;
+        auvol::SetMouseShareEnabled(MouseShareToggle().IsOn());
+    }
+
+    void MainWindow::CursorHostSelector_SelectionChanged(
+        SelectorBar const&,
+        SelectorBarSelectionChangedEventArgs const&)
+    {
+        if (m_applyingMouseShare) return;
+        const int host = CursorHostSelector().SelectedItem() == CursorMacItem() ? 1 : 0;
+        auvol::SetMouseCursorHost(host);
+    }
+
+    void MainWindow::MouseHotkeyButton_Click(IInspectable const&,
+                                             RoutedEventArgs const&)
+    {
+        if (m_capturingMouseHotkey) {
+            auvol::CancelMouseHotkeyCapture();
+        } else {
+            auvol::BeginMouseHotkeyCapture();
+        }
+    }
+
+    void MainWindow::UpdateMouseShare(bool enabled,
+                                      int cursorHost,
+                                      bool capturingHotkey,
+                                      std::wstring const& hotkeyDisplay)
+    {
+        m_applyingMouseShare = true;
+        MouseShareToggle().IsOn(enabled);
+        CursorHostSelector().SelectedItem(
+            cursorHost == 1 ? CursorMacItem() : CursorWindowsItem());
+        m_applyingMouseShare = false;
+        const auto visibility = enabled ? Visibility::Visible : Visibility::Collapsed;
+        MouseCursorRow().Visibility(visibility);
+        MouseHotkeyRow().Visibility(visibility);
+        m_capturingMouseHotkey = capturingHotkey;
+        MouseHotkeyText().Text(hotkeyDisplay);
+        MouseHotkeyButton().Content(winrt::box_value(
+            capturingHotkey ? L"取消" : L"更改"));
     }
 
     void MainWindow::ResetStats()

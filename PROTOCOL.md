@@ -101,3 +101,47 @@ Direction synchronization never changes the paused/running state. A paused app
 updates its selected direction but remains paused until the user resumes it.
 An enabled automatic-output policy may originate the same direction change when
 its selected headphones become the stable default system output.
+
+## Mouse share channel
+
+Mouse takeover uses a fourth always-on UDP channel on port 7780. It never
+carries audio and does not alter ALV2, ALC1, or AUP1 packets. The four wire
+bytes `41 4c 49 31` spell `ALI1`. All multi-byte integers are little-endian.
+
+Enabling the feature, the cursor host, and HID events all travel on this
+channel. Audio Start/Stop and audio direction are independent. A paused audio
+session still shares the mouse.
+
+### State packet
+
+Exactly 24 bytes. The consensus rules match ALC1: Lamport `(version,
+origin_id)`, set/ack, five-second heartbeat acknowledgements, and retries
+until acknowledgement. A local change on either computer updates both peers.
+
+| Offset | Size | Field | Description |
+|---:|---:|---|---|
+| 0 | 4 | magic | `ALI1` |
+| 4 | 1 | type | `1` set state, `2` acknowledgement |
+| 5 | 1 | flags | Bit 0: enabled. Bit 1: cursor host (`0` Windows, `1` Mac) |
+| 6 | 2 | reserved | Zero |
+| 8 | 8 | version | Lamport version incremented for each local change |
+| 16 | 8 | origin_id | Stable random identifier of the device that created the change |
+
+### Event packet
+
+Exactly 20 bytes. Sent only by the computer that currently sees a physical
+(non-injected) mouse while the cursor host is the other computer. The cursor
+host injects immediately. There is no jitter buffer. Stale packets are dropped
+by sequence. Button state is a bitmask so a lost packet is healed by the next.
+
+| Offset | Size | Field | Description |
+|---:|---:|---|---|
+| 0 | 4 | magic | `ALI1` |
+| 4 | 1 | type | `3` mouse event |
+| 5 | 1 | buttons | Bit 0 left, 1 right, 2 middle, 3 X1, 4 X2 |
+| 6 | 2 | reserved | Zero |
+| 8 | 2 | dx | Signed relative X |
+| 10 | 2 | dy | Signed relative Y |
+| 12 | 2 | wheel | Signed vertical wheel, 120 units per notch |
+| 14 | 2 | hwheel | Signed horizontal wheel, 120 units per notch |
+| 16 | 4 | sequence | Increments once per event datagram |

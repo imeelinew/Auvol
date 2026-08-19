@@ -6,10 +6,10 @@
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
 	<string>Auvol</string>
-	<key>CFBundleIconName</key>
-	<string>Auvol</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIconName</key>
+	<string>Auvol</string>
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
@@ -28,6 +28,8 @@
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>Auvol captures system audio to send it to the selected LAN device.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_auvol._udp.</string>
@@ -36,8 +38,6 @@
 	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Auvol needs local network access to receive audio from other devices.</string>
-	<key>NSAudioCaptureUsageDescription</key>
-	<string>Auvol captures system audio to send it to the selected LAN device.</string>
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
 	<key>SUFeedURL</key>

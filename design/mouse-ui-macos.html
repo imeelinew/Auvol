@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Auvol · macOS 鼠标接管 UI</title>
+<style>
+  :root {
+    --doc-bg: #eceae6;
+    --doc-ink: #1b1a18;
+    --doc-muted: #6d6a63;
+    --doc-line: #d8d4cc;
+    --doc-card: #fbfaf7;
+    --accent: #0a6cd0;
+    --new: #0a6cd0;
+    --font: -apple-system, "SF Pro Text", "Helvetica Neue", "PingFang SC", sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: var(--font);
+    color: var(--doc-ink);
+    background:
+      radial-gradient(1100px 520px at 8% -8%, #f7f2e7 0%, transparent 55%),
+      radial-gradient(900px 480px at 100% 0%, #e2ebf5 0%, transparent 52%),
+      var(--doc-bg);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 1180px; margin: 0 auto; padding: 40px 28px 88px; }
+  h1 { margin: 0 0 8px; font-size: 28px; font-weight: 680; letter-spacing: -0.022em; }
+  .lede { margin: 0 0 22px; max-width: 72ch; color: var(--doc-muted); font-size: 15px; }
+  .lede strong { color: var(--doc-ink); font-weight: 600; }
+
+  .notes {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+  @media (max-width: 860px) { .notes { grid-template-columns: 1fr; } }
+  .note {
+    background: var(--doc-card);
+    border: 1px solid var(--doc-line);
+    border-radius: 12px;
+    padding: 14px 16px;
+  }
+  .note .k {
+    font-size: 11px; font-weight: 650; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--accent); margin-bottom: 6px;
+  }
+  .note p { margin: 0; font-size: 13px; color: #4b4842; }
+
+  .toolbar {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    margin-bottom: 22px; padding: 10px 14px;
+    background: var(--doc-card); border: 1px solid var(--doc-line); border-radius: 12px;
+  }
+  .toolbar label { font-size: 12px; font-weight: 620; color: var(--doc-muted); }
+  .segbar { display: inline-flex; background: rgba(0,0,0,.055); border-radius: 8px; padding: 2px; gap: 2px; }
+  .segbar button {
+    appearance: none; border: 0; background: transparent; cursor: pointer;
+    font: inherit; font-size: 12px; color: #4b4842;
+    padding: 5px 11px; border-radius: 6px;
+  }
+  .segbar button.active { background: #fff; color: var(--doc-ink); box-shadow: 0 1px 2px rgba(0,0,0,.14); }
+  .toolbar .hint { font-size: 12px; color: var(--doc-muted); margin-left: auto; }
+
+  .stage { display: flex; flex-wrap: wrap; gap: 36px; align-items: flex-start; }
+  .callouts { flex: 1; min-width: 280px; max-width: 420px; padding-top: 18px; }
+  .callout { display: flex; gap: 12px; margin: 0 0 18px; }
+  .callout .n {
+    flex: none; width: 22px; height: 22px; border-radius: 50%;
+    background: var(--accent); color: #fff; font-size: 12px; font-weight: 700;
+    display: grid; place-items: center; margin-top: 1px;
+  }
+  .callout h3 { margin: 0 0 3px; font-size: 13.5px; font-weight: 640; }
+  .callout p { margin: 0; font-size: 13px; color: var(--doc-muted); }
+
+  .wall {
+    position: relative; width: 380px; padding: 0 0 28px;
+    border-radius: 14px; overflow: hidden;
+    box-shadow: 0 2px 6px rgba(0,0,0,.10), 0 18px 44px rgba(0,0,0,.14);
+    background:
+      radial-gradient(120% 80% at 15% 0%, #cfe0f4 0%, transparent 60%),
+      radial-gradient(120% 90% at 90% 10%, #f3dfe9 0%, transparent 55%),
+      linear-gradient(165deg, #dfe9f3 0%, #eef0ea 45%, #e6dfd4 100%);
+  }
+  .menubar {
+    height: 26px; display: flex; align-items: center; justify-content: flex-end;
+    gap: 13px; padding: 0 12px;
+    background: rgba(255,255,255,.42);
+    backdrop-filter: blur(24px) saturate(180%);
+    border-bottom: .5px solid rgba(0,0,0,.08);
+  }
+  .mb-clock { font-size: 11px; font-weight: 500; color: rgba(0,0,0,.72); }
+  .mb-host {
+    width: 26px; height: 18px; border-radius: 6px;
+    background: rgba(10,124,255,.18); color: #0a7aff;
+    display: grid; place-items: center;
+  }
+  .mb-host svg { width: 13px; height: 13px; }
+
+  .pop {
+    --ink: #17171a;
+    --ink-2: rgba(0,0,0,.52);
+    --ink-3: rgba(0,0,0,.34);
+    --card-bg: rgba(255,255,255,.62);
+    --card-br: rgba(0,0,0,.055);
+    --sep: rgba(0,0,0,.072);
+    --track: rgba(0,0,0,.085);
+    --tile-bg: rgba(0,0,0,.055);
+    --pop-bg: rgba(246,246,249,.76);
+    --blue: #0a7aff;
+    --ctl: #0a7aff;
+    --tone: #0a7aff;
+    --red: #e0322a;
+    width: 320px; margin: 8px auto 0; border-radius: 15px; padding: 12px 14px;
+    color: var(--ink); background: var(--pop-bg);
+    backdrop-filter: blur(46px) saturate(180%);
+    box-shadow: 0 0 0 .5px rgba(0,0,0,.13), 0 10px 34px rgba(0,0,0,.20), 0 2px 6px rgba(0,0,0,.10);
+    font-size: 13px;
+  }
+  .hero {
+    border-radius: 11px; padding: 9px 11px 11px; margin-bottom: 10px;
+    background: color-mix(in srgb, var(--tone) 8%, transparent);
+    box-shadow: inset 0 0 0 .5px color-mix(in srgb, var(--tone) 20%, transparent);
+  }
+  .hero-top { display: flex; align-items: center; gap: 8px; }
+  .app-tile {
+    width: 22px; height: 22px; border-radius: 6.5px; flex: none;
+    display: grid; place-items: center; color: #fff;
+    background: linear-gradient(160deg, #4da3ff, var(--tone));
+  }
+  .app-tile svg { width: 13px; height: 13px; }
+  .wordmark { font-size: 13.5px; font-weight: 600; }
+  .pill {
+    margin-left: auto; display: inline-flex; align-items: center; gap: 5px;
+    height: 19px; padding: 0 8px 0 7px; border-radius: 9.5px;
+    background: color-mix(in srgb, var(--tone) 15%, transparent);
+    color: var(--tone); font-size: 10.5px; font-weight: 620;
+  }
+  .pill .dot { width: 5.5px; height: 5.5px; border-radius: 50%; background: var(--tone); }
+  .hero-status { margin: 3px 0 0 30px; font-size: 11.5px; color: var(--ink-2); }
+  .meter-row { display: flex; align-items: center; gap: 9px; margin: 9px 0 0; }
+  .meter { position: relative; flex: 1; height: 4px; border-radius: 2px; background: var(--track); overflow: hidden; }
+  .meter .fill {
+    position: absolute; inset: 0 auto 0 0; width: 58%; border-radius: 2px;
+    background: linear-gradient(90deg, var(--tone), color-mix(in srgb, var(--tone) 55%, #5ac8fa));
+  }
+  .meter .peak { position: absolute; top: 0; bottom: 0; left: 72%; width: 1.5px; background: var(--tone); }
+  .meter-val { font-family: var(--mono); font-size: 10.5px; color: var(--ink-2); min-width: 52px; text-align: right; }
+
+  .dir {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 2px;
+    padding: 2px; border-radius: 8px; background: var(--track); margin-bottom: 10px;
+  }
+  .dir span {
+    height: 24px; border-radius: 6.5px; display: grid; place-items: center;
+    font-size: 11.5px; color: var(--ink-2); font-weight: 530;
+  }
+  .dir span.on {
+    background: #fff; color: var(--ink); font-weight: 590;
+    box-shadow: 0 .5px 2px rgba(0,0,0,.16);
+  }
+
+  .card {
+    border-radius: 11px; background: var(--card-bg);
+    box-shadow: inset 0 0 0 .5px var(--card-br);
+    margin-bottom: 10px; overflow: hidden;
+  }
+  .card.new {
+    box-shadow:
+      inset 0 0 0 .5px color-mix(in srgb, var(--ctl) 28%, transparent),
+      0 0 0 1.5px color-mix(in srgb, var(--ctl) 22%, transparent);
+  }
+  .row { display: flex; align-items: center; gap: 10px; padding: 8px 11px; min-height: 40px; position: relative; }
+  .row + .row::before {
+    content: ""; position: absolute; left: 43px; right: 0; top: 0; height: .5px; background: var(--sep);
+  }
+  .row.stack { flex-direction: column; align-items: stretch; gap: 7px; }
+  .row.stack + .row::before, .row + .row.stack::before { left: 43px; }
+  .tile {
+    width: 22px; height: 22px; border-radius: 6px; flex: none;
+    display: grid; place-items: center; background: var(--tile-bg); color: var(--ink-2);
+  }
+  .tile svg { width: 13px; height: 13px; }
+  .tile.tinted { background: color-mix(in srgb, var(--ctl) 15%, transparent); color: var(--ctl); }
+  .row-text { min-width: 0; flex: 1; }
+  .row-title { display: block; font-size: 12.5px; font-weight: 500; line-height: 1.3; }
+  .row-sub { display: block; font-size: 10.5px; color: var(--ink-3); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row-val { font-size: 12px; font-weight: 500; color: var(--ink-2); flex: none; max-width: 168px; text-align: right; }
+  .sw {
+    appearance: none; border: 0; cursor: pointer; flex: none;
+    width: 30px; height: 18px; border-radius: 9px; padding: 0;
+    background: var(--track); position: relative;
+  }
+  .sw::after {
+    content: ""; position: absolute; top: 2px; left: 2px;
+    width: 14px; height: 14px; border-radius: 50%; background: #fff;
+    box-shadow: 0 .5px 1.5px rgba(0,0,0,.3); transition: transform .18s;
+  }
+  .sw.on { background: var(--ctl); }
+  .sw.on::after { transform: translateX(12px); }
+  .slider { position: relative; height: 14px; display: flex; align-items: center; }
+  .slider .strack { position: absolute; left: 0; right: 0; height: 3px; border-radius: 1.5px; background: var(--track); }
+  .slider .sfill { position: absolute; left: 0; width: 6%; height: 3px; border-radius: 1.5px; background: var(--ctl); }
+  .slider .sknob {
+    position: absolute; left: 6%; width: 13px; height: 13px; border-radius: 50%;
+    background: #fff; box-shadow: 0 .5px 2px rgba(0,0,0,.32); transform: translateX(-50%);
+  }
+  .scale { display: flex; justify-content: space-between; margin-top: 5px; font-size: 9.5px; color: var(--ink-3); }
+
+  .mini-seg {
+    display: inline-flex; background: var(--track); border-radius: 7px; padding: 2px; gap: 1px; flex: none;
+  }
+  .mini-seg button {
+    appearance: none; border: 0; cursor: pointer; font: inherit;
+    height: 22px; padding: 0 9px; border-radius: 5.5px; background: transparent;
+    color: var(--ink-2); font-size: 11px;
+  }
+  .mini-seg button.on {
+    background: #fff; color: var(--ink); font-weight: 590;
+    box-shadow: 0 .5px 1.5px rgba(0,0,0,.16);
+  }
+  .link-btn {
+    appearance: none; border: 0; background: transparent; cursor: pointer;
+    font: inherit; font-size: 10.5px; font-weight: 520; color: var(--ctl); padding: 0;
+  }
+  .kbd {
+    font-family: var(--mono); font-size: 11px; font-weight: 560;
+    background: rgba(0,0,0,.055); padding: 2px 6px; border-radius: 5px;
+    box-shadow: inset 0 0 0 .5px rgba(0,0,0,.06);
+  }
+  .kbd.listening { background: color-mix(in srgb, var(--ctl) 14%, transparent); color: var(--ctl); }
+
+  .err {
+    margin: 0; padding: 7px 10px; border-radius: 0;
+    font-size: 11px; line-height: 1.35;
+    background: color-mix(in srgb, var(--red) 12%, transparent);
+    color: color-mix(in srgb, var(--red) 85%, var(--ink));
+    display: flex; gap: 7px; align-items: flex-start;
+  }
+  .err svg { width: 12px; height: 12px; flex: none; margin-top: .5px; }
+  .err button {
+    appearance: none; border: 0; background: transparent; cursor: pointer;
+    font: inherit; font-size: 11px; font-weight: 600; color: inherit;
+    text-decoration: underline; padding: 0; margin-left: auto; white-space: nowrap;
+  }
+
+  .foot { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+  .btn {
+    appearance: none; border: 0; cursor: pointer; font: inherit;
+    height: 25px; padding: 0 14px; border-radius: 12.5px;
+    font-size: 11.5px; font-weight: 560;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .btn svg { width: 10px; height: 10px; }
+  .btn.ghost { background: transparent; color: var(--ink-3); padding: 0 8px; }
+  .btn.secondary {
+    margin-left: auto; color: var(--ink);
+    background: #fff; box-shadow: 0 .5px 2px rgba(0,0,0,.14);
+  }
+
+  .hidden { display: none !important; }
+  figure { margin: 0; }
+  figcaption { margin-top: 12px; font-size: 12.5px; color: var(--doc-muted); width: 380px; }
+  figcaption strong { color: var(--doc-ink); }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>macOS 菜单栏 · 鼠标接管</h1>
+  <p class="lede">
+    音频区按现状保留：方向、耳机跟随、缓冲、电平、暂停都不动。
+    新增一块独立卡片，插在<strong>控制卡和状态卡之间</strong>。
+    鼠标开关和音频 Start/Stop 无关，暂停传声时快捷键仍然有效。
+  </p>
+
+  <div class="notes">
+    <div class="note">
+      <div class="k">入口</div>
+      <p>总开关「鼠标接管」。关掉时只占一行，不挤现有音频控件。</p>
+    </div>
+    <div class="note">
+      <div class="k">切换</div>
+      <p>光标位置选 Mac / Windows，和音频方向是两套选择器。两端快捷键默认 ⌃⌥M。</p>
+    </div>
+    <div class="note">
+      <div class="k">权限</div>
+      <p>没开辅助功能时，卡片内出红条，点「打开设置」。不占用音频错误横幅。</p>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <label>预览状态</label>
+    <div class="segbar" id="states">
+      <button class="active" data-s="off">关闭</button>
+      <button data-s="forward">转到 Mac</button>
+      <button data-s="away">转到 Windows</button>
+      <button data-s="perm">缺权限</button>
+    </div>
+    <span class="hint">点卡片里的开关 / 光标选择也可以</span>
+  </div>
+
+  <div class="stage">
+    <figure>
+      <div class="wall">
+        <div class="menubar">
+          <div class="mb-host" title="Auvol">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round"><path d="M4.3 5.6a3.6 3.6 0 0 1 0 4.8"/><path d="M7.5 3.9a6.4 6.4 0 0 1 0 8.2"/><path d="M10.7 2.2a9.2 9.2 0 0 1 0 11.6"/></svg>
+          </div>
+          <span class="mb-clock">16:03</span>
+        </div>
+
+        <div class="pop" id="pop">
+          <div class="hero">
+            <div class="hero-top">
+              <div class="app-tile">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round"><path d="M4.3 5.6a3.6 3.6 0 0 1 0 4.8"/><path d="M7.5 3.9a6.4 6.4 0 0 1 0 8.2"/><path d="M10.7 2.2a9.2 9.2 0 0 1 0 11.6"/></svg>
+              </div>
+              <span class="wordmark">Auvol</span>
+              <span class="pill"><span class="dot"></span>传输中</span>
+            </div>
+            <div class="hero-status">正在播放 Windows 音频</div>
+            <div class="meter-row">
+              <div class="meter"><i class="fill"></i><i class="peak"></i></div>
+              <span class="meter-val">-25.2 dB</span>
+            </div>
+          </div>
+
+          <div class="dir">
+            <span class="on">Windows → Mac</span>
+            <span>Mac → Windows</span>
+          </div>
+
+          <div class="card">
+            <div class="row">
+              <div class="tile tinted">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3.1 10.4V8.3a4.9 4.9 0 0 1 9.8 0v2.1"/><rect x="1.9" y="9.4" width="2.7" height="4.5" rx="1.35"/><rect x="11.4" y="9.4" width="2.7" height="4.5" rx="1.35"/></svg>
+              </div>
+              <div class="row-text">
+                <span class="row-title">自动跟随耳机</span>
+                <span class="row-sub">WF-1000XM5</span>
+              </div>
+              <button class="sw on" tabindex="-1"></button>
+            </div>
+            <div class="row stack">
+              <div class="row" style="padding:0;min-height:0">
+                <div class="tile">
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.45"><circle cx="8" cy="9" r="5.1"/><path d="M8 6.2V9l1.9 1.4"/><path d="M6.2 2.1h3.6"/></svg>
+                </div>
+                <span class="row-title">缓冲目标</span>
+                <span class="row-val" style="font-family:var(--mono);font-size:11px">11 ms</span>
+              </div>
+              <div style="padding-left:32px">
+                <div class="slider"><i class="strack"></i><i class="sfill"></i><i class="sknob"></i></div>
+                <div class="scale"><span>8 ms · 最低延迟</span><span>80 ms · 最稳</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card new" id="mouse-card">
+            <div class="row">
+              <div class="tile" id="mouse-tile">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="4.2" y="1.8" width="7.6" height="12.4" rx="3.6"/>
+                  <path d="M8 1.8v4.2"/>
+                </svg>
+              </div>
+              <div class="row-text">
+                <span class="row-title">鼠标接管</span>
+              </div>
+              <button class="sw" id="mouse-sw" aria-label="鼠标接管"></button>
+            </div>
+            <div class="row hidden" id="cursor-row">
+              <div class="tile">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3.4 2.4 7.1 13.1l1.3-3.5 3.6 3.2.9-1-3.7-3.1 3.4-1.4z" fill="currentColor" stroke="none"/>
+                </svg>
+              </div>
+              <div class="row-text">
+                <span class="row-title">光标位置</span>
+              </div>
+              <div class="mini-seg" id="cursor-seg">
+                <button type="button" data-host="mac" class="on">Mac</button>
+                <button type="button" data-host="win">Windows</button>
+              </div>
+            </div>
+            <div class="row hidden" id="hotkey-row">
+              <div class="tile">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="1.8" y="4.2" width="12.4" height="8.2" rx="1.6"/>
+                  <path d="M4.2 10.6h1.6M7.2 10.6h4.6M5.1 7.4h.1M8 7.4h.1M10.9 7.4h.1"/>
+                </svg>
+              </div>
+              <div class="row-text">
+                <span class="row-title">切换快捷键</span>
+              </div>
+              <span class="kbd" id="kbd">⌃⌥M</span>
+              <button class="link-btn" id="rebind">更改</button>
+            </div>
+            <div class="err hidden" id="perm">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2.6 14.4 13.4H1.6z" stroke-linejoin="round"/><path d="M8 6.5v3.1"/><circle cx="8" cy="11.6" r=".8" fill="currentColor" stroke="none"/></svg>
+              <span>需要辅助功能权限才能截获和注入鼠标。</span>
+              <button type="button">打开设置</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="row">
+              <div class="tile">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7.6 3 4.7 5.7H2.3v4.6h2.4l2.9 2.7z" fill="currentColor" stroke-width="1.2"/><path d="M10.3 6.2a2.9 2.9 0 0 1 0 3.6"/><path d="M12.4 4.4a5.6 5.6 0 0 1 0 7.2"/></svg>
+              </div>
+              <span class="row-title">播放设备</span>
+              <span class="row-val">MacBook Air 扬声器</span>
+            </div>
+            <div class="row">
+              <div class="tile">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.45"><rect x="2.2" y="3.4" width="11.6" height="7.6" rx="1.6"/><path d="M5.4 13.4h5.2"/><path d="M8 11v2.4"/></svg>
+              </div>
+              <div class="row-text">
+                <span class="row-title">链路</span>
+                <span class="row-sub">169.254.190.152</span>
+              </div>
+              <span class="row-val">有线 · 正常</span>
+            </div>
+          </div>
+
+          <div class="foot">
+            <button class="btn ghost">退出</button>
+            <button class="btn ghost">检查更新</button>
+            <button class="btn secondary">
+              <svg viewBox="0 0 16 16" fill="currentColor"><rect x="4" y="3" width="3.1" height="10" rx="1.2"/><rect x="8.9" y="3" width="3.1" height="10" rx="1.2"/></svg>
+              暂停
+            </button>
+          </div>
+        </div>
+      </div>
+      <figcaption>
+        <strong>蓝圈是唯一新增块。</strong>
+        上面方向选择器仍只管音频；下面暂停仍只停 PCM。鼠标卡片不读缓冲目标，也不出现在电平条里。
+      </figcaption>
+    </figure>
+
+    <div class="callouts">
+      <div class="callout">
+        <span class="n">1</span>
+        <div>
+          <h3>总开关一行收起</h3>
+          <p>默认关闭时只有「鼠标接管」+ 开关，菜单栏弹层高度几乎不变。</p>
+        </div>
+      </div>
+      <div class="callout">
+        <span class="n">2</span>
+        <div>
+          <h3>光标位置写设备名</h3>
+          <p>用 Mac / Windows，不用「本机 / 对端」，避免两头打开时各说各话。这和音频方向是两套状态。</p>
+        </div>
+      </div>
+      <div class="callout">
+        <span class="n">3</span>
+        <div>
+          <h3>快捷键是日常入口</h3>
+          <p>真正切光标靠全局热键。面板里的分段控件给看状态、改键、没有键盘时用。接收器插在哪由非注入事件自动认，界面只展示，不配死。</p>
+        </div>
+      </div>
+      <div class="callout">
+        <span class="n">4</span>
+        <div>
+          <h3>权限不进音频错误条</h3>
+          <p>辅助功能缺失只画在鼠标卡片底部。音频 hero、红色故障条继续只反映 PCM 链路。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const state = { on: false, host: "mac", perm: false, listening: false };
+  const $ = (id) => document.getElementById(id);
+
+  function paint() {
+    $("mouse-sw").classList.toggle("on", state.on);
+    $("mouse-tile").classList.toggle("tinted", state.on && !state.perm);
+    $("cursor-row").classList.toggle("hidden", !state.on);
+    $("hotkey-row").classList.toggle("hidden", !state.on);
+    $("perm").classList.toggle("hidden", !state.perm);
+    $("cursor-seg").querySelectorAll("button").forEach((b) => {
+      b.classList.toggle("on", b.dataset.host === state.host);
+    });
+    $("kbd").textContent = state.listening ? "按下新快捷键…" : "⌃⌥M";
+    $("kbd").classList.toggle("listening", state.listening);
+    $("rebind").textContent = state.listening ? "取消" : "更改";
+    document.querySelectorAll("#states button").forEach((b) => {
+      const s = b.dataset.s;
+      const active =
+        (s === "off" && !state.on && !state.perm) ||
+        (s === "forward" && state.on && state.host === "mac" && !state.perm) ||
+        (s === "away" && state.on && state.host === "win" && !state.perm) ||
+        (s === "perm" && state.perm);
+      b.classList.toggle("active", active);
+    });
+  }
+
+  $("mouse-sw").addEventListener("click", () => {
+    state.on = !state.on;
+    if (!state.on) { state.perm = false; state.listening = false; }
+    paint();
+  });
+  $("cursor-seg").addEventListener("click", (e) => {
+    const host = e.target.dataset.host;
+    if (!host) return;
+    state.host = host;
+    state.listening = false;
+    paint();
+  });
+  $("rebind").addEventListener("click", () => {
+    state.listening = !state.listening;
+    paint();
+  });
+  document.getElementById("states").addEventListener("click", (e) => {
+    const s = e.target.dataset.s;
+    if (!s) return;
+    state.listening = false;
+    if (s === "off") { state.on = false; state.perm = false; state.host = "mac"; }
+    if (s === "forward") { state.on = true; state.perm = false; state.host = "mac"; }
+    if (s === "away") { state.on = true; state.perm = false; state.host = "win"; }
+    if (s === "perm") { state.on = true; state.perm = true; state.host = "mac"; }
+    paint();
+  });
+  paint();
+</script>
+</body>
+</html>

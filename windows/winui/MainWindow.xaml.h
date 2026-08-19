@@ -19,6 +19,13 @@ namespace winrt::Auvol::implementation
                                       Microsoft::UI::Xaml::RoutedEventArgs const&);
         void UseCurrentOutputButton_Click(IInspectable const&,
                                           Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void MouseShareToggle_Toggled(IInspectable const&,
+                                      Microsoft::UI::Xaml::RoutedEventArgs const&);
+        void CursorHostSelector_SelectionChanged(
+            Microsoft::UI::Xaml::Controls::SelectorBar const&,
+            Microsoft::UI::Xaml::Controls::SelectorBarSelectionChangedEventArgs const&);
+        void MouseHotkeyButton_Click(IInspectable const&,
+                                     Microsoft::UI::Xaml::RoutedEventArgs const&);
 
     private:
         HWND m_hwnd = nullptr;
@@ -26,6 +33,8 @@ namespace winrt::Auvol::implementation
         bool m_running = false;
         bool m_applyingAutoFollow = false;
         bool m_applyingDirection = false;
+        bool m_applyingMouseShare = false;
+        bool m_capturingMouseHotkey = false;
         std::string m_deviceName;
 
         void ConfigureWindow();
@@ -40,6 +49,10 @@ namespace winrt::Auvol::implementation
                               std::string const& followedOutputName,
                               std::string const& currentOutputName,
                               bool currentOutputAvailable);
+        void UpdateMouseShare(bool enabled,
+                              int cursorHost,
+                              bool capturingHotkey,
+                              std::wstring const& hotkeyDisplay);
         void ResetStats();
         void ApplyDirectionSelection();
         void ApplyStatePill(hstring const& text,
