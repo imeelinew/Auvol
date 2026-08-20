@@ -74,7 +74,6 @@ struct StatusView: View {
             if !engine.errorMessage.isEmpty {
                 errorBanner
             }
-            directionPicker
             controlCard
             mouseCard
             statusCard
@@ -247,15 +246,15 @@ struct StatusView: View {
 
     // MARK: - Direction
 
-    private var directionPicker: some View {
+    private var listenHostPicker: some View {
         HStack(spacing: 2) {
-            directionSegment(.receive, "Windows → Mac")
-            directionSegment(.send, "Mac → Windows")
+            directionSegment(.receive, "Mac")
+            directionSegment(.send, "Windows")
         }
         .padding(2)
         .background(
             Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.085),
-            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+            in: RoundedRectangle(cornerRadius: 7, style: .continuous)
         )
     }
 
@@ -265,13 +264,13 @@ struct StatusView: View {
             engine.selectRole(target)
         } label: {
             Text(title)
-                .font(.system(size: 11.5, weight: selected ? .semibold : .medium))
+                .font(.system(size: 11, weight: selected ? .semibold : .regular))
                 .foregroundStyle(selected ? Color.primary : Color.secondary)
-                .frame(maxWidth: .infinity)
-                .frame(height: 24)
+                .padding(.horizontal, 9)
+                .frame(height: 22)
                 .background {
                     if selected {
-                        RoundedRectangle(cornerRadius: 6.5, style: .continuous)
+                        RoundedRectangle(cornerRadius: 5.5, style: .continuous)
                             .fill(raisedFill)
                             .shadow(color: .black.opacity(0.16), radius: 1, y: 0.5)
                     }
@@ -285,6 +284,10 @@ struct StatusView: View {
 
     private var controlCard: some View {
         Card {
+            row(icon: "ear", title: "正在听") {
+                listenHostPicker
+            }
+            RowSeparator()
             row(icon: "headphones",
                 title: "自动跟随耳机",
                 subtitle: autoFollowDescription,

@@ -3,12 +3,10 @@ import SwiftUI
 
 @main
 struct AuvolApp: App {
-    @NSApplicationDelegateAdaptor(AuvolAppDelegate.self) private var appDelegate
     @StateObject private var engine: ReceiverEngine
     @StateObject private var updateService = UpdateService()
 
     init() {
-        MouseShareController.restoreSystemPointerState()
         let arguments = CommandLine.arguments
         let role: TransportRole = arguments.contains("--send") ? .send : .receive
         let peerIndex = arguments.firstIndex(of: "--peer")
@@ -28,16 +26,6 @@ struct AuvolApp: App {
             MenuBarStatusLabel(engine: engine)
         }
         .menuBarExtraStyle(.window)
-    }
-}
-
-private final class AuvolAppDelegate: NSObject, NSApplicationDelegate {
-    func applicationDidFinishLaunching(_ notification: Notification) {
-        MouseShareController.restoreSystemPointerState()
-    }
-
-    func applicationWillTerminate(_ notification: Notification) {
-        MouseShareController.restoreSystemPointerState()
     }
 }
 
@@ -78,7 +66,7 @@ private struct MenuBarStatusLabel: View {
     }
 
     private var accessibilityLabel: String {
-        let direction = engine.role == .send ? "Mac → Windows" : "Windows → Mac"
+        let direction = engine.role == .send ? "Windows" : "Mac"
         return "Auvol，\(direction)，\(TransportTone(engine).label)"
     }
 }

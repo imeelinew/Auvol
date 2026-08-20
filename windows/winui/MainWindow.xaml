@@ -215,30 +215,20 @@
                                       FontSize="20"
                                       VerticalAlignment="Center"
                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                            <StackPanel Grid.Column="1"
-                                        VerticalAlignment="Center"
-                                        Spacing="2">
-                                <TextBlock Text="传输方向"
-                                           Style="{ThemeResource BodyStrongTextBlockStyle}" />
-                            </StackPanel>
+                            <TextBlock Grid.Column="1"
+                                       Text="正在听"
+                                       VerticalAlignment="Center"
+                                       Style="{ThemeResource BodyStrongTextBlockStyle}" />
                             <SelectorBar x:Name="DirectionSelector"
                                          Grid.Column="2"
                                          SelectionChanged="DirectionSelector_SelectionChanged">
                                 <SelectorBarItem x:Name="SendModeItem"
-                                                 Text="Windows → Mac"
+                                                 Text="Mac"
                                                  IsSelected="True"
-                                                 AutomationProperties.AutomationId="SendToMac">
-                                    <SelectorBarItem.Icon>
-                                        <FontIcon Glyph="&#xE72A;" />
-                                    </SelectorBarItem.Icon>
-                                </SelectorBarItem>
+                                                 AutomationProperties.AutomationId="SendToMac" />
                                 <SelectorBarItem x:Name="ReceiveModeItem"
-                                                 Text="Mac → Windows"
-                                                 AutomationProperties.AutomationId="ReceiveFromMac">
-                                    <SelectorBarItem.Icon>
-                                        <FontIcon Glyph="&#xE896;" />
-                                    </SelectorBarItem.Icon>
-                                </SelectorBarItem>
+                                                 Text="Windows"
+                                                 AutomationProperties.AutomationId="ReceiveFromMac" />
                             </SelectorBar>
                         </Grid>
 

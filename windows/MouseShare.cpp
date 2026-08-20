@@ -1,10 +1,10 @@
 #include "AuvolCore.h"
 
-#define OEMRESOURCE
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <windows.h>
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <chrono>
@@ -15,6 +15,7 @@
 #include <optional>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #ifndef HID_USAGE_PAGE_GENERIC
@@ -32,16 +33,30 @@ constexpr UINT8 kTypeAck = 2;
 constexpr UINT8 kTypeEvent = 3;
 constexpr UINT16 kPort = 7780;
 constexpr size_t kStateBytes = 24;
-constexpr size_t kEventBytes = 20;
+constexpr size_t kEventBytes = 28;
 constexpr ULONG_PTR kInjectMagic = 0x4155564Cul;
 constexpr UINT kHotkeyId = 1;
 constexpr UINT kHotkeyCapturedMessage = WM_APP + 1;
+constexpr UINT kRefreshCaptureMessage = WM_APP + 2;
+constexpr UINT kRefreshHotkeyMessage = WM_APP + 3;
+constexpr auto kHeartbeatInterval = std::chrono::milliseconds(500);
+constexpr auto kPeerTimeout = std::chrono::milliseconds(1500);
+constexpr size_t kEventQueueCapacity = 4096;
 
 struct WireState {
     UINT64 version = 0;
     UINT64 originID = 0;
     bool enabled = false;
     UINT8 host = 0;
+};
+
+struct QueuedMouseEvent {
+    INT16 dx = 0;
+    INT16 dy = 0;
+    INT16 wheel = 0;
+    INT16 hwheel = 0;
+    UINT8 buttons = 0;
+    UINT64 captureGeneration = 0;
 };
 
 bool Outranks(const WireState& left, const WireState& right) {
@@ -57,29 +72,34 @@ bool SameKey(const WireState& left, const WireState& right) {
 void Put16(void* destination, UINT16 value) {
     memcpy(destination, &value, sizeof(value));
 }
+
 void Put32(void* destination, UINT32 value) {
     memcpy(destination, &value, sizeof(value));
 }
+
 void Put64(void* destination, UINT64 value) {
     memcpy(destination, &value, sizeof(value));
 }
+
 UINT16 Get16(const void* source) {
     UINT16 value = 0;
     memcpy(&value, source, sizeof(value));
     return value;
 }
+
 UINT32 Get32(const void* source) {
     UINT32 value = 0;
     memcpy(&value, source, sizeof(value));
     return value;
 }
+
 UINT64 Get64(const void* source) {
     UINT64 value = 0;
     memcpy(&value, source, sizeof(value));
     return value;
 }
 
-UINT64 GenerateDeviceID() {
+UINT64 GenerateID() {
     GUID guid = {};
     UINT64 first = 0;
     UINT64 second = 0;
@@ -138,14 +158,6 @@ std::wstring HotkeyDisplay(UINT modifiers, UINT vk) {
     return text;
 }
 
-HCURSOR MakeBlankCursor() {
-    const int size = 32;
-    std::vector<BYTE> andMask(size * size / 8, 0xFF);
-    std::vector<BYTE> xorMask(size * size / 8, 0);
-    return CreateCursor(GetModuleHandleW(nullptr), 0, 0, size, size,
-                        andMask.data(), xorMask.data());
-}
-
 std::mutex g_mutex;
 std::string g_peerIP;
 std::string g_localIP;
@@ -156,31 +168,44 @@ WireState g_winner;
 std::optional<WireState> g_pending;
 unsigned g_attemptsSent = 0;
 std::chrono::steady_clock::time_point g_nextSend;
-std::atomic<bool> g_running{false};
-std::atomic<SOCKET> g_socket{INVALID_SOCKET};
-std::thread g_udpThread;
-std::thread g_messageThread;
-HWND g_window = nullptr;
-HHOOK g_mouseHook = nullptr;
-HHOOK g_keyboardHook = nullptr;
-HCURSOR g_blankCursor = nullptr;
-bool g_cursorHidden = false;
-bool g_capturingHotkey = false;
 UINT g_hotkeyModifiers = MOD_CONTROL | MOD_ALT;
 UINT g_hotkeyVk = 'M';
-UINT32 g_eventSequence = 0;
-UINT32 g_lastIncomingSequence = 0;
-UINT8 g_buttons = 0;
-UINT8 g_injectedButtons = 0;
-bool g_hasPhysicalMouse = false;
-std::chrono::steady_clock::time_point g_lastPhysical;
 auvol::MouseShareCallback g_callback;
+
+std::atomic<bool> g_running{false};
+std::atomic<bool> g_peerAlive{false};
+std::atomic<ULONGLONG> g_peerLeaseDeadline{0};
+std::atomic<bool> g_captureActive{false};
+std::atomic<bool> g_capturingHotkey{false};
+std::atomic<SOCKET> g_socket{INVALID_SOCKET};
+std::atomic<HWND> g_window{nullptr};
+std::atomic<UINT64> g_endpointGeneration{1};
+std::atomic<UINT64> g_captureGeneration{1};
+std::thread g_udpThread;
+std::thread g_eventThread;
+std::thread g_messageThread;
+
+HHOOK g_mouseHook = nullptr;       // Message thread only.
+HHOOK g_keyboardHook = nullptr;    // Message thread only.
+bool g_rawInputRegistered = false; // Message thread only.
+bool g_cursorHidden = false;       // Message thread only.
+UINT8 g_physicalButtons = 0;       // Message thread only.
+
+std::mutex g_injectionMutex;
+UINT8 g_injectedButtons = 0;
+UINT64 g_incomingEventSessionID = 0;
+UINT32 g_lastIncomingSequence = 0;
+
+std::array<QueuedMouseEvent, kEventQueueCapacity> g_eventQueue;
+std::atomic<size_t> g_eventQueueWrite{0};
+std::atomic<size_t> g_eventQueueRead{0};
+HANDLE g_eventReady = nullptr;
+UINT64 g_eventSessionID = 0;
 
 void NotifyUI() {
     auvol::MouseShareCallback callback;
     bool enabled = false;
     UINT8 host = 0;
-    bool capturing = false;
     UINT modifiers = 0;
     UINT vk = 0;
     {
@@ -188,10 +213,10 @@ void NotifyUI() {
         callback = g_callback;
         enabled = g_winner.enabled;
         host = g_winner.host;
-        capturing = g_capturingHotkey;
         modifiers = g_hotkeyModifiers;
         vk = g_hotkeyVk;
     }
+    const bool capturing = g_capturingHotkey.load(std::memory_order_acquire);
     if (callback) {
         callback(enabled, host, capturing,
                  capturing ? L"按下新快捷键…" : HotkeyDisplay(modifiers, vk));
@@ -255,8 +280,25 @@ void EnsureStateLocked() {
         }
         RegCloseKey(key);
     }
-    if (g_deviceID == 0) g_deviceID = GenerateDeviceID();
+    if (g_deviceID == 0) g_deviceID = GenerateID();
     g_clock = std::max(g_clock, g_winner.version);
+    if (g_winner.version == 0 || g_winner.originID == 0) {
+        ++g_clock;
+        if (g_clock == 0) g_clock = 1;
+        g_winner = {g_clock, g_deviceID, false, 0};
+    }
+    PersistLocked();
+}
+
+void PublishLocked() {
+    EnsureStateLocked();
+    g_clock = std::max(g_clock, g_winner.version) + 1;
+    if (g_clock == 0) g_clock = 1;
+    g_winner.version = g_clock;
+    g_winner.originID = g_deviceID;
+    g_pending = g_winner;
+    g_attemptsSent = 0;
+    g_nextSend = std::chrono::steady_clock::now();
     PersistLocked();
 }
 
@@ -296,78 +338,31 @@ void SendState(SOCKET socketFD, UINT8 type, const WireState& state,
            reinterpret_cast<const sockaddr*>(&destination), sizeof(destination));
 }
 
-void HideSystemCursor() {
+void RepairLegacySystemCursor() {
+    // The previous implementation replaced global cursor resources. Reload the
+    // user's configured scheme once, never from an input callback.
+    SystemParametersInfoW(SPI_SETCURSORS, 0, nullptr, 0);
+}
+
+void HideCursorForCapture() {
     if (g_cursorHidden) return;
-    if (!g_blankCursor) g_blankCursor = MakeBlankCursor();
-    if (!g_blankCursor) return;
-    SetSystemCursor(CopyCursor(g_blankCursor), OCR_NORMAL);
-    SetSystemCursor(CopyCursor(g_blankCursor), OCR_IBEAM);
-    SetSystemCursor(CopyCursor(g_blankCursor), OCR_HAND);
-    SetSystemCursor(CopyCursor(g_blankCursor), OCR_APPSTARTING);
+    SetCursor(nullptr);
     g_cursorHidden = true;
 }
 
-void RestoreSystemCursor() {
-    SystemParametersInfoW(SPI_SETCURSORS, 0, nullptr, 0);
+void RestoreCursorAfterCapture() {
+    if (!g_cursorHidden) return;
+    SetCursor(LoadCursorW(nullptr, IDC_ARROW));
     g_cursorHidden = false;
 }
 
-bool ShouldForwardLocked() {
-    const auto now = std::chrono::steady_clock::now();
-    g_hasPhysicalMouse = g_hasPhysicalMouse &&
-        (now - g_lastPhysical) < std::chrono::milliseconds(800);
-    return g_winner.enabled && g_winner.host == 1 && g_hasPhysicalMouse;
-}
-
-void UpdateCursorLocked() {
-    if (ShouldForwardLocked()) HideSystemCursor();
-    else RestoreSystemCursor();
-}
-
-void PublishLocked() {
-    EnsureStateLocked();
-    g_clock = std::max(g_clock, g_winner.version) + 1;
-    if (g_clock == 0) g_clock = 1;
-    g_winner.version = g_clock;
-    g_winner.originID = g_deviceID;
-    g_pending = g_winner;
-    g_attemptsSent = 0;
-    g_nextSend = std::chrono::steady_clock::now();
-    PersistLocked();
-}
-
-void SendEvent(INT16 dx, INT16 dy, INT16 wheel, INT16 hwheel, UINT8 buttons) {
-    SOCKET socketFD = g_socket.load(std::memory_order_acquire);
-    sockaddr_in destination = {};
-    if (socketFD == INVALID_SOCKET || !PeerAddress(&destination)) return;
-    std::array<UINT8, kEventBytes> packet = {};
-    Put32(packet.data(), kMagic);
-    packet[4] = kTypeEvent;
-    packet[5] = buttons;
-    Put16(packet.data() + 8, static_cast<UINT16>(dx));
-    Put16(packet.data() + 10, static_cast<UINT16>(dy));
-    Put16(packet.data() + 12, static_cast<UINT16>(wheel));
-    Put16(packet.data() + 14, static_cast<UINT16>(hwheel));
-    UINT32 sequence = 0;
-    {
-        std::lock_guard<std::mutex> lock(g_mutex);
-        ++g_eventSequence;
-        if (g_eventSequence == 0) g_eventSequence = 1;
-        sequence = g_eventSequence;
-    }
-    Put32(packet.data() + 16, sequence);
-    sendto(socketFD, reinterpret_cast<const char*>(packet.data()),
-           static_cast<int>(packet.size()), 0,
-           reinterpret_cast<const sockaddr*>(&destination), sizeof(destination));
-}
-
-void InjectButtons(UINT8 next) {
-    const UINT8 changed = g_injectedButtons ^ next;
-    std::vector<INPUT> inputs;
-    auto push = [&](DWORD flags) {
+void AddButtonInputs(UINT8 current, UINT8 next, std::vector<INPUT>& inputs) {
+    const UINT8 changed = current ^ next;
+    auto push = [&](DWORD flags, DWORD data = 0) {
         INPUT input = {};
         input.type = INPUT_MOUSE;
         input.mi.dwFlags = flags;
+        input.mi.mouseData = data;
         input.mi.dwExtraInfo = kInjectMagic;
         inputs.push_back(input);
     };
@@ -375,42 +370,216 @@ void InjectButtons(UINT8 next) {
     if (changed & 2) push(next & 2 ? MOUSEEVENTF_RIGHTDOWN : MOUSEEVENTF_RIGHTUP);
     if (changed & 4) push(next & 4 ? MOUSEEVENTF_MIDDLEDOWN : MOUSEEVENTF_MIDDLEUP);
     if (changed & 8) {
-        INPUT input = {};
-        input.type = INPUT_MOUSE;
-        input.mi.dwFlags = next & 8 ? MOUSEEVENTF_XDOWN : MOUSEEVENTF_XUP;
-        input.mi.mouseData = XBUTTON1;
-        input.mi.dwExtraInfo = kInjectMagic;
-        inputs.push_back(input);
+        push(next & 8 ? MOUSEEVENTF_XDOWN : MOUSEEVENTF_XUP, XBUTTON1);
     }
     if (changed & 16) {
-        INPUT input = {};
-        input.type = INPUT_MOUSE;
-        input.mi.dwFlags = next & 16 ? MOUSEEVENTF_XDOWN : MOUSEEVENTF_XUP;
-        input.mi.mouseData = XBUTTON2;
-        input.mi.dwExtraInfo = kInjectMagic;
-        inputs.push_back(input);
+        push(next & 16 ? MOUSEEVENTF_XDOWN : MOUSEEVENTF_XUP, XBUTTON2);
     }
-    if (!inputs.empty()) {
-        SendInput(static_cast<UINT>(inputs.size()), inputs.data(), sizeof(INPUT));
+}
+
+void ResetInjectedInput() {
+    std::lock_guard<std::mutex> lock(g_injectionMutex);
+    if (g_injectedButtons != 0) {
+        std::vector<INPUT> inputs;
+        AddButtonInputs(g_injectedButtons, 0, inputs);
+        if (!inputs.empty()) {
+            SendInput(static_cast<UINT>(inputs.size()), inputs.data(), sizeof(INPUT));
+        }
     }
-    g_injectedButtons = next;
+    g_injectedButtons = 0;
+    g_incomingEventSessionID = 0;
+    g_lastIncomingSequence = 0;
+}
+
+void PostCaptureRefresh() {
+    if (HWND window = g_window.load(std::memory_order_acquire)) {
+        PostMessageW(window, kRefreshCaptureMessage, 0, 0);
+    }
+}
+
+void SetPeerAlive(bool alive) {
+    if (!alive) g_peerLeaseDeadline.store(0, std::memory_order_release);
+    const bool previous = g_peerAlive.exchange(alive, std::memory_order_acq_rel);
+    if (previous == alive) return;
+    if (!alive) ResetInjectedInput();
+    PostCaptureRefresh();
+}
+
+bool PeerLeaseIsValid() {
+    const ULONGLONG deadline =
+        g_peerLeaseDeadline.load(std::memory_order_acquire);
+    return deadline != 0 && GetTickCount64() <= deadline;
+}
+
+void NotePeerActivity() {
+    g_peerLeaseDeadline.store(
+        GetTickCount64() + static_cast<ULONGLONG>(kPeerTimeout.count()),
+        std::memory_order_release);
+    SetPeerAlive(true);
+}
+
+bool DesiredCapture() {
+    if (!g_eventReady || !g_peerAlive.load(std::memory_order_acquire) ||
+        !PeerLeaseIsValid()) {
+        return false;
+    }
+    std::lock_guard<std::mutex> lock(g_mutex);
+    EnsureStateLocked();
+    return g_winner.enabled && g_winner.host == 1;
+}
+
+bool SetRawInputRegistration(HWND window, bool enabled) {
+    RAWINPUTDEVICE device = {};
+    device.usUsagePage = HID_USAGE_PAGE_GENERIC;
+    device.usUsage = HID_USAGE_GENERIC_MOUSE;
+    device.dwFlags = enabled ? RIDEV_INPUTSINK : RIDEV_REMOVE;
+    device.hwndTarget = enabled ? window : nullptr;
+    return RegisterRawInputDevices(&device, 1, sizeof(device)) == TRUE;
+}
+
+UINT8 CurrentPhysicalButtons() {
+    UINT8 buttons = 0;
+    if (GetAsyncKeyState(VK_LBUTTON) & 0x8000) buttons |= 1;
+    if (GetAsyncKeyState(VK_RBUTTON) & 0x8000) buttons |= 2;
+    if (GetAsyncKeyState(VK_MBUTTON) & 0x8000) buttons |= 4;
+    if (GetAsyncKeyState(VK_XBUTTON1) & 0x8000) buttons |= 8;
+    if (GetAsyncKeyState(VK_XBUTTON2) & 0x8000) buttons |= 16;
+    return buttons;
+}
+
+LRESULT CALLBACK MouseHook(int code, WPARAM wParam, LPARAM lParam);
+LRESULT CALLBACK KeyboardHook(int code, WPARAM wParam, LPARAM lParam);
+
+void DisableCaptureOnMessageThread(HWND window) {
+    g_captureActive.store(false, std::memory_order_release);
+    g_captureGeneration.fetch_add(1, std::memory_order_acq_rel);
+    if (g_mouseHook) {
+        UnhookWindowsHookEx(g_mouseHook);
+        g_mouseHook = nullptr;
+    }
+    if (g_rawInputRegistered) {
+        SetRawInputRegistration(window, false);
+        g_rawInputRegistered = false;
+    }
+    g_physicalButtons = 0;
+    RestoreCursorAfterCapture();
+}
+
+void RefreshCaptureOnMessageThread(HWND window) {
+    const bool desired = DesiredCapture();
+    if (!desired) {
+        DisableCaptureOnMessageThread(window);
+        return;
+    }
+    if (g_captureActive.load(std::memory_order_acquire) &&
+        g_mouseHook && g_rawInputRegistered) {
+        return;
+    }
+
+    DisableCaptureOnMessageThread(window);
+    if (!SetRawInputRegistration(window, true)) return;
+    g_rawInputRegistered = true;
+    g_mouseHook = SetWindowsHookExW(WH_MOUSE_LL, MouseHook, nullptr, 0);
+    if (!g_mouseHook) {
+        SetRawInputRegistration(window, false);
+        g_rawInputRegistered = false;
+        return;
+    }
+    g_physicalButtons = CurrentPhysicalButtons();
+    g_captureGeneration.fetch_add(1, std::memory_order_acq_rel);
+    g_captureActive.store(true, std::memory_order_release);
+}
+
+bool EnqueueMouseEvent(const QueuedMouseEvent& event) {
+    const size_t write = g_eventQueueWrite.load(std::memory_order_relaxed);
+    const size_t next = (write + 1) % kEventQueueCapacity;
+    if (next == g_eventQueueRead.load(std::memory_order_acquire)) return false;
+    g_eventQueue[write] = event;
+    g_eventQueueWrite.store(next, std::memory_order_release);
+    if (g_eventReady) SetEvent(g_eventReady);
+    return true;
+}
+
+bool DequeueMouseEvent(QueuedMouseEvent* event) {
+    if (!event) return false;
+    const size_t read = g_eventQueueRead.load(std::memory_order_relaxed);
+    if (read == g_eventQueueWrite.load(std::memory_order_acquire)) return false;
+    *event = g_eventQueue[read];
+    g_eventQueueRead.store((read + 1) % kEventQueueCapacity,
+                           std::memory_order_release);
+    return true;
+}
+
+void SendQueuedEvent(SOCKET socketFD, const sockaddr_in& destination,
+                     const QueuedMouseEvent& event, UINT32 sequence) {
+    std::array<UINT8, kEventBytes> packet = {};
+    Put32(packet.data(), kMagic);
+    packet[4] = kTypeEvent;
+    packet[5] = event.buttons & 0x1f;
+    Put16(packet.data() + 8, static_cast<UINT16>(event.dx));
+    Put16(packet.data() + 10, static_cast<UINT16>(event.dy));
+    Put16(packet.data() + 12, static_cast<UINT16>(event.wheel));
+    Put16(packet.data() + 14, static_cast<UINT16>(event.hwheel));
+    Put32(packet.data() + 16, sequence);
+    Put64(packet.data() + 20, g_eventSessionID);
+    sendto(socketFD, reinterpret_cast<const char*>(packet.data()),
+           static_cast<int>(packet.size()), 0,
+           reinterpret_cast<const sockaddr*>(&destination), sizeof(destination));
+}
+
+void EventSenderThread() {
+    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
+    UINT32 sequence = 0;
+    while (g_running.load(std::memory_order_acquire)) {
+        WaitForSingleObject(g_eventReady, 500);
+        QueuedMouseEvent event;
+        while (DequeueMouseEvent(&event)) {
+            if (!g_running.load(std::memory_order_acquire)) return;
+            if (!g_captureActive.load(std::memory_order_acquire) ||
+                !g_peerAlive.load(std::memory_order_acquire) ||
+                !PeerLeaseIsValid() ||
+                event.captureGeneration !=
+                    g_captureGeneration.load(std::memory_order_acquire)) {
+                continue;
+            }
+            const SOCKET socketFD = g_socket.load(std::memory_order_acquire);
+            sockaddr_in destination = {};
+            if (socketFD == INVALID_SOCKET || !PeerAddress(&destination)) continue;
+            ++sequence;
+            if (sequence == 0) sequence = 1;
+            SendQueuedEvent(socketFD, destination, event, sequence);
+        }
+    }
 }
 
 void InjectEvent(INT16 dx, INT16 dy, INT16 wheel, INT16 hwheel, UINT8 buttons,
-                 UINT32 sequence) {
-    bool enabled = false;
-    UINT8 host = 0;
+                 UINT32 sequence, UINT64 sessionID) {
+    bool accept = false;
     {
         std::lock_guard<std::mutex> lock(g_mutex);
-        enabled = g_winner.enabled;
-        host = g_winner.host;
-        if (g_lastIncomingSequence != 0) {
-            const INT32 delta = static_cast<INT32>(sequence - g_lastIncomingSequence);
-            if (delta <= 0) return;
-        }
-        g_lastIncomingSequence = sequence;
+        accept = g_winner.enabled && g_winner.host == 0;
     }
-    if (!enabled || host != 0) return;
+    if (!accept || !g_peerAlive.load(std::memory_order_acquire)) return;
+
+    std::lock_guard<std::mutex> lock(g_injectionMutex);
+    if (g_incomingEventSessionID != sessionID) {
+        if (g_injectedButtons != 0) {
+            std::vector<INPUT> releases;
+            AddButtonInputs(g_injectedButtons, 0, releases);
+            if (!releases.empty()) {
+                SendInput(static_cast<UINT>(releases.size()), releases.data(), sizeof(INPUT));
+            }
+        }
+        g_injectedButtons = 0;
+        g_incomingEventSessionID = sessionID;
+        g_lastIncomingSequence = 0;
+    } else if (g_lastIncomingSequence != 0) {
+        const INT32 delta = static_cast<INT32>(sequence - g_lastIncomingSequence);
+        if (delta <= 0) return;
+    }
+    g_lastIncomingSequence = sequence;
+
+    std::vector<INPUT> inputs;
     if (dx != 0 || dy != 0) {
         INPUT input = {};
         input.type = INPUT_MOUSE;
@@ -418,16 +587,17 @@ void InjectEvent(INT16 dx, INT16 dy, INT16 wheel, INT16 hwheel, UINT8 buttons,
         input.mi.dx = dx;
         input.mi.dy = dy;
         input.mi.dwExtraInfo = kInjectMagic;
-        SendInput(1, &input, sizeof(INPUT));
+        inputs.push_back(input);
     }
-    InjectButtons(buttons);
+    AddButtonInputs(g_injectedButtons, buttons & 0x1f, inputs);
+    g_injectedButtons = buttons & 0x1f;
     if (wheel != 0) {
         INPUT input = {};
         input.type = INPUT_MOUSE;
         input.mi.dwFlags = MOUSEEVENTF_WHEEL;
         input.mi.mouseData = static_cast<DWORD>(wheel);
         input.mi.dwExtraInfo = kInjectMagic;
-        SendInput(1, &input, sizeof(INPUT));
+        inputs.push_back(input);
     }
     if (hwheel != 0) {
         INPUT input = {};
@@ -435,28 +605,11 @@ void InjectEvent(INT16 dx, INT16 dy, INT16 wheel, INT16 hwheel, UINT8 buttons,
         input.mi.dwFlags = MOUSEEVENTF_HWHEEL;
         input.mi.mouseData = static_cast<DWORD>(hwheel);
         input.mi.dwExtraInfo = kInjectMagic;
-        SendInput(1, &input, sizeof(INPUT));
+        inputs.push_back(input);
     }
-}
-
-void ApplyIncomingState(const WireState& incoming) {
-    bool changed = false;
-    {
-        std::lock_guard<std::mutex> lock(g_mutex);
-        EnsureStateLocked();
-        if (incoming.version > g_clock) {
-            g_clock = incoming.version;
-            changed = true;
-        }
-        if (Outranks(incoming, g_winner)) {
-            g_winner = incoming;
-            changed = true;
-            if (g_pending && Outranks(incoming, *g_pending)) g_pending.reset();
-        }
-        if (changed) PersistLocked();
-        UpdateCursorLocked();
+    if (!inputs.empty()) {
+        SendInput(static_cast<UINT>(inputs.size()), inputs.data(), sizeof(INPUT));
     }
-    if (changed) NotifyUI();
 }
 
 bool ParseState(const UINT8* bytes, int length, UINT8* type, WireState* state) {
@@ -474,22 +627,67 @@ bool ParseState(const UINT8* bytes, int length, UINT8* type, WireState* state) {
     return state->version != 0 && state->originID != 0;
 }
 
-void ReceivePacket(SOCKET socketFD, const UINT8* bytes, int length,
-                   const sockaddr_in& source) {
-    if (!SourceMatchesPeer(source)) return;
-    if (length == static_cast<int>(kEventBytes) && Get32(bytes) == kMagic &&
-        bytes[4] == kTypeEvent) {
-        InjectEvent(static_cast<INT16>(Get16(bytes + 8)),
-                    static_cast<INT16>(Get16(bytes + 10)),
-                    static_cast<INT16>(Get16(bytes + 12)),
-                    static_cast<INT16>(Get16(bytes + 14)),
-                    bytes[5], Get32(bytes + 16));
-        return;
+bool ParseEvent(const UINT8* bytes, int length, QueuedMouseEvent* event,
+                UINT32* sequence, UINT64* sessionID) {
+    if (!bytes || !event || !sequence || !sessionID ||
+        length != static_cast<int>(kEventBytes) || Get32(bytes) != kMagic ||
+        bytes[4] != kTypeEvent || bytes[6] != 0 || bytes[7] != 0) {
+        return false;
     }
+    event->buttons = bytes[5] & 0x1f;
+    event->dx = static_cast<INT16>(Get16(bytes + 8));
+    event->dy = static_cast<INT16>(Get16(bytes + 10));
+    event->wheel = static_cast<INT16>(Get16(bytes + 12));
+    event->hwheel = static_cast<INT16>(Get16(bytes + 14));
+    *sequence = Get32(bytes + 16);
+    *sessionID = Get64(bytes + 20);
+    return *sequence != 0 && *sessionID != 0;
+}
+
+void ApplyIncomingState(const WireState& incoming) {
+    bool changed = false;
+    bool resetInput = false;
+    {
+        std::lock_guard<std::mutex> lock(g_mutex);
+        EnsureStateLocked();
+        if (incoming.version > g_clock) {
+            g_clock = incoming.version;
+            changed = true;
+        }
+        if (Outranks(incoming, g_winner)) {
+            g_winner = incoming;
+            changed = true;
+            if (g_pending && Outranks(incoming, *g_pending)) g_pending.reset();
+        }
+        if (changed) PersistLocked();
+        resetInput = !g_winner.enabled || g_winner.host != 0;
+    }
+    if (resetInput) ResetInjectedInput();
+    if (changed) {
+        PostCaptureRefresh();
+        NotifyUI();
+    }
+}
+
+bool ReceivePacket(SOCKET socketFD, const UINT8* bytes, int length,
+                   const sockaddr_in& source) {
+    if (!SourceMatchesPeer(source)) return false;
+
+    QueuedMouseEvent event;
+    UINT32 sequence = 0;
+    UINT64 sessionID = 0;
+    if (ParseEvent(bytes, length, &event, &sequence, &sessionID)) {
+        NotePeerActivity();
+        InjectEvent(event.dx, event.dy, event.wheel, event.hwheel,
+                    event.buttons, sequence, sessionID);
+        return true;
+    }
+
     UINT8 type = 0;
     WireState incoming;
-    if (!ParseState(bytes, length, &type, &incoming)) return;
-    if (incoming.version != 0) {
+    if (!ParseState(bytes, length, &type, &incoming)) return false;
+    NotePeerActivity();
+    {
         std::lock_guard<std::mutex> lock(g_mutex);
         if (incoming.version > g_clock) g_clock = incoming.version;
         if (type == kTypeAck && g_pending &&
@@ -506,6 +704,7 @@ void ReceivePacket(SOCKET socketFD, const UINT8* bytes, int length,
         }
         SendState(socketFD, kTypeAck, response, source);
     }
+    return true;
 }
 
 void MaybeSendPending(SOCKET socketFD) {
@@ -565,7 +764,10 @@ SOCKET OpenSocket() {
         localIP = g_localIP;
     }
     if (!localIP.empty()) {
-        inet_pton(AF_INET, localIP.c_str(), &local.sin_addr);
+        if (inet_pton(AF_INET, localIP.c_str(), &local.sin_addr) != 1) {
+            closesocket(socketFD);
+            return INVALID_SOCKET;
+        }
     } else {
         local.sin_addr.s_addr = htonl(INADDR_ANY);
     }
@@ -579,31 +781,64 @@ SOCKET OpenSocket() {
     return socketFD;
 }
 
+void ClosePublishedSocket(SOCKET* socketFD) {
+    if (!socketFD || *socketFD == INVALID_SOCKET) return;
+    SOCKET expected = *socketFD;
+    if (g_socket.compare_exchange_strong(expected, INVALID_SOCKET,
+                                         std::memory_order_acq_rel)) {
+        closesocket(*socketFD);
+    }
+    *socketFD = INVALID_SOCKET;
+}
+
 void UdpThread() {
     WSADATA winsock = {};
     if (WSAStartup(MAKEWORD(2, 2), &winsock) != 0) return;
-    SOCKET socketFD = OpenSocket();
-    if (socketFD == INVALID_SOCKET) {
-        WSACleanup();
-        return;
-    }
-    g_socket.store(socketFD, std::memory_order_release);
-    auto nextHeartbeat = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+
+    SOCKET socketFD = INVALID_SOCKET;
+    UINT64 endpointGeneration = 0;
+    auto nextHeartbeat = std::chrono::steady_clock::now();
+    auto lastPeerPacket = std::chrono::steady_clock::now();
+
     while (g_running.load(std::memory_order_acquire)) {
+        const UINT64 currentEndpoint =
+            g_endpointGeneration.load(std::memory_order_acquire);
+        if (socketFD == INVALID_SOCKET || currentEndpoint != endpointGeneration) {
+            ClosePublishedSocket(&socketFD);
+            SetPeerAlive(false);
+            endpointGeneration = currentEndpoint;
+            socketFD = OpenSocket();
+            if (socketFD == INVALID_SOCKET) {
+                Sleep(200);
+                continue;
+            }
+            g_socket.store(socketFD, std::memory_order_release);
+            nextHeartbeat = std::chrono::steady_clock::now();
+        }
+
         MaybeSendPending(socketFD);
         const auto now = std::chrono::steady_clock::now();
         if (now >= nextHeartbeat) {
             SendHeartbeat(socketFD);
-            nextHeartbeat = now + std::chrono::seconds(5);
+            nextHeartbeat = now + kHeartbeatInterval;
         }
+        if (g_peerAlive.load(std::memory_order_acquire) &&
+            now - lastPeerPacket > kPeerTimeout) {
+            SetPeerAlive(false);
+        }
+
         fd_set readable;
         FD_ZERO(&readable);
         FD_SET(socketFD, &readable);
-        timeval timeout = {0, 50000};
+        timeval timeout = {0, 20000};
         const int selected = select(0, &readable, nullptr, nullptr, &timeout);
         if (selected == SOCKET_ERROR) {
             if (!g_running.load(std::memory_order_acquire)) break;
-            Sleep(50);
+            if (g_endpointGeneration.load(std::memory_order_acquire) !=
+                endpointGeneration) {
+                continue;
+            }
+            Sleep(20);
             continue;
         }
         if (selected <= 0 || !FD_ISSET(socketFD, &readable)) continue;
@@ -619,32 +854,32 @@ void UdpThread() {
                 if (WSAGetLastError() == WSAEWOULDBLOCK) break;
                 break;
             }
-            ReceivePacket(socketFD, bytes.data(), count, source);
+            if (ReceivePacket(socketFD, bytes.data(), count, source)) {
+                lastPeerPacket = std::chrono::steady_clock::now();
+            }
         }
     }
-    SOCKET expected = socketFD;
-    if (g_socket.compare_exchange_strong(expected, INVALID_SOCKET,
-                                         std::memory_order_acq_rel)) {
-        closesocket(socketFD);
-    }
+
+    SetPeerAlive(false);
+    ClosePublishedSocket(&socketFD);
     WSACleanup();
 }
 
 LRESULT CALLBACK MouseHook(int code, WPARAM wParam, LPARAM lParam) {
-    if (code >= 0 && lParam) {
+    if (code < 0) return CallNextHookEx(g_mouseHook, code, wParam, lParam);
+    if (lParam && g_captureActive.load(std::memory_order_acquire)) {
+        if (!PeerLeaseIsValid()) {
+            g_captureActive.store(false, std::memory_order_release);
+            g_captureGeneration.fetch_add(1, std::memory_order_acq_rel);
+            RestoreCursorAfterCapture();
+            PostCaptureRefresh();
+            return CallNextHookEx(g_mouseHook, code, wParam, lParam);
+        }
         const auto* info = reinterpret_cast<MSLLHOOKSTRUCT*>(lParam);
         if ((info->flags & LLMHF_INJECTED) == 0 &&
             info->dwExtraInfo != kInjectMagic) {
-            bool swallow = false;
-            {
-                std::lock_guard<std::mutex> lock(g_mutex);
-                EnsureStateLocked();
-                g_hasPhysicalMouse = true;
-                g_lastPhysical = std::chrono::steady_clock::now();
-                swallow = ShouldForwardLocked();
-                UpdateCursorLocked();
-            }
-            if (swallow) return 1;
+            HideCursorForCapture();
+            return 1;
         }
     }
     return CallNextHookEx(g_mouseHook, code, wParam, lParam);
@@ -658,7 +893,7 @@ bool IsModifierVk(UINT vk) {
 }
 
 LRESULT CALLBACK KeyboardHook(int code, WPARAM wParam, LPARAM lParam) {
-    if (code >= 0 && g_capturingHotkey &&
+    if (code >= 0 && g_capturingHotkey.load(std::memory_order_acquire) &&
         (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN) && lParam) {
         const auto* info = reinterpret_cast<KBDLLHOOKSTRUCT*>(lParam);
         if (!IsModifierVk(info->vkCode)) {
@@ -674,10 +909,12 @@ LRESULT CALLBACK KeyboardHook(int code, WPARAM wParam, LPARAM lParam) {
                     std::lock_guard<std::mutex> lock(g_mutex);
                     g_hotkeyModifiers = modifiers;
                     g_hotkeyVk = info->vkCode;
-                    g_capturingHotkey = false;
                     PersistLocked();
                 }
-                if (g_window) PostMessageW(g_window, kHotkeyCapturedMessage, 0, 0);
+                g_capturingHotkey.store(false, std::memory_order_release);
+                if (HWND window = g_window.load(std::memory_order_acquire)) {
+                    PostMessageW(window, kHotkeyCapturedMessage, 0, 0);
+                }
                 return 1;
             }
         }
@@ -687,6 +924,7 @@ LRESULT CALLBACK KeyboardHook(int code, WPARAM wParam, LPARAM lParam) {
 }
 
 void HandleRawInput(HRAWINPUT handle) {
+    if (!g_captureActive.load(std::memory_order_acquire)) return;
     UINT size = 0;
     GetRawInputData(handle, RID_INPUT, nullptr, &size, sizeof(RAWINPUTHEADER));
     if (size == 0) return;
@@ -698,65 +936,68 @@ void HandleRawInput(HRAWINPUT handle) {
     const auto* raw = reinterpret_cast<RAWINPUT*>(buffer.data());
     if (raw->header.dwType != RIM_TYPEMOUSE) return;
     const RAWMOUSE& mouse = raw->data.mouse;
+
     INT16 dx = 0;
     INT16 dy = 0;
     if ((mouse.usFlags & MOUSE_MOVE_ABSOLUTE) == 0) {
-        dx = static_cast<INT16>(mouse.lLastX);
-        dy = static_cast<INT16>(mouse.lLastY);
+        dx = static_cast<INT16>(std::clamp<LONG>(mouse.lLastX, INT16_MIN, INT16_MAX));
+        dy = static_cast<INT16>(std::clamp<LONG>(mouse.lLastY, INT16_MIN, INT16_MAX));
     }
-    UINT8 buttons = 0;
-    INT16 wheel = 0;
-    INT16 hwheel = 0;
-    {
-        std::lock_guard<std::mutex> lock(g_mutex);
-        if (mouse.usButtonFlags & RI_MOUSE_LEFT_BUTTON_DOWN) g_buttons |= 1;
-        if (mouse.usButtonFlags & RI_MOUSE_LEFT_BUTTON_UP) g_buttons &= ~1;
-        if (mouse.usButtonFlags & RI_MOUSE_RIGHT_BUTTON_DOWN) g_buttons |= 2;
-        if (mouse.usButtonFlags & RI_MOUSE_RIGHT_BUTTON_UP) g_buttons &= ~2;
-        if (mouse.usButtonFlags & RI_MOUSE_MIDDLE_BUTTON_DOWN) g_buttons |= 4;
-        if (mouse.usButtonFlags & RI_MOUSE_MIDDLE_BUTTON_UP) g_buttons &= ~4;
-        if (mouse.usButtonFlags & RI_MOUSE_BUTTON_4_DOWN) g_buttons |= 8;
-        if (mouse.usButtonFlags & RI_MOUSE_BUTTON_4_UP) g_buttons &= ~8;
-        if (mouse.usButtonFlags & RI_MOUSE_BUTTON_5_DOWN) g_buttons |= 16;
-        if (mouse.usButtonFlags & RI_MOUSE_BUTTON_5_UP) g_buttons &= ~16;
-        if (mouse.usButtonFlags & RI_MOUSE_WHEEL) {
-            wheel = static_cast<INT16>(mouse.usButtonData);
-        }
-        if (mouse.usButtonFlags & RI_MOUSE_HWHEEL) {
-            hwheel = static_cast<INT16>(mouse.usButtonData);
-        }
-        buttons = g_buttons;
-        if (!ShouldForwardLocked()) return;
+    if (mouse.usButtonFlags & RI_MOUSE_LEFT_BUTTON_DOWN) g_physicalButtons |= 1;
+    if (mouse.usButtonFlags & RI_MOUSE_LEFT_BUTTON_UP) g_physicalButtons &= ~1;
+    if (mouse.usButtonFlags & RI_MOUSE_RIGHT_BUTTON_DOWN) g_physicalButtons |= 2;
+    if (mouse.usButtonFlags & RI_MOUSE_RIGHT_BUTTON_UP) g_physicalButtons &= ~2;
+    if (mouse.usButtonFlags & RI_MOUSE_MIDDLE_BUTTON_DOWN) g_physicalButtons |= 4;
+    if (mouse.usButtonFlags & RI_MOUSE_MIDDLE_BUTTON_UP) g_physicalButtons &= ~4;
+    if (mouse.usButtonFlags & RI_MOUSE_BUTTON_4_DOWN) g_physicalButtons |= 8;
+    if (mouse.usButtonFlags & RI_MOUSE_BUTTON_4_UP) g_physicalButtons &= ~8;
+    if (mouse.usButtonFlags & RI_MOUSE_BUTTON_5_DOWN) g_physicalButtons |= 16;
+    if (mouse.usButtonFlags & RI_MOUSE_BUTTON_5_UP) g_physicalButtons &= ~16;
+    const INT16 wheel = (mouse.usButtonFlags & RI_MOUSE_WHEEL)
+        ? static_cast<INT16>(mouse.usButtonData) : 0;
+    const INT16 hwheel = (mouse.usButtonFlags & RI_MOUSE_HWHEEL)
+        ? static_cast<INT16>(mouse.usButtonData) : 0;
+
+    QueuedMouseEvent event;
+    event.dx = dx;
+    event.dy = dy;
+    event.wheel = wheel;
+    event.hwheel = hwheel;
+    event.buttons = g_physicalButtons;
+    event.captureGeneration = g_captureGeneration.load(std::memory_order_acquire);
+    if (!EnqueueMouseEvent(event)) {
+        // A saturated sender must never leave the local pointer swallowed.
+        g_captureActive.store(false, std::memory_order_release);
+        g_captureGeneration.fetch_add(1, std::memory_order_acq_rel);
+        RestoreCursorAfterCapture();
+        SetPeerAlive(false);
     }
-    SendEvent(dx, dy, wheel, hwheel, buttons);
 }
 
-void ToggleHost() {
+void ToggleHostOnMessageThread(HWND window) {
+    bool resetInput = false;
     {
         std::lock_guard<std::mutex> lock(g_mutex);
         EnsureStateLocked();
         if (!g_winner.enabled) return;
         g_winner.host = g_winner.host == 0 ? 1 : 0;
         PublishLocked();
-        UpdateCursorLocked();
+        resetInput = g_winner.host != 0;
     }
+    if (resetInput) ResetInjectedInput();
+    RefreshCaptureOnMessageThread(window);
     NotifyUI();
 }
 
-LRESULT CALLBACK MouseWndProc(HWND window, UINT message, WPARAM wParam,
-                              LPARAM lParam) {
-    switch (message) {
-    case WM_INPUT:
-        HandleRawInput(reinterpret_cast<HRAWINPUT>(lParam));
-        return 0;
-    case WM_HOTKEY:
-        if (wParam == kHotkeyId) ToggleHost();
-        return 0;
-    case kHotkeyCapturedMessage: {
-        if (g_keyboardHook) {
-            UnhookWindowsHookEx(g_keyboardHook);
-            g_keyboardHook = nullptr;
-        }
+void RefreshHotkeyOnMessageThread(HWND window) {
+    if (g_keyboardHook) {
+        UnhookWindowsHookEx(g_keyboardHook);
+        g_keyboardHook = nullptr;
+    }
+    UnregisterHotKey(window, kHotkeyId);
+    if (g_capturingHotkey.load(std::memory_order_acquire)) {
+        g_keyboardHook = SetWindowsHookExW(WH_KEYBOARD_LL, KeyboardHook, nullptr, 0);
+    } else {
         UINT modifiers = 0;
         UINT vk = 0;
         {
@@ -764,11 +1005,30 @@ LRESULT CALLBACK MouseWndProc(HWND window, UINT message, WPARAM wParam,
             modifiers = g_hotkeyModifiers;
             vk = g_hotkeyVk;
         }
-        UnregisterHotKey(window, kHotkeyId);
         RegisterHotKey(window, kHotkeyId, modifiers | MOD_NOREPEAT, vk);
+    }
+}
+
+LRESULT CALLBACK MouseWndProc(HWND window, UINT message, WPARAM wParam,
+                              LPARAM lParam) {
+    switch (message) {
+    case WM_INPUT:
+        HandleRawInput(reinterpret_cast<HRAWINPUT>(lParam));
+        return DefWindowProcW(window, message, wParam, lParam);
+    case WM_HOTKEY:
+        if (wParam == kHotkeyId) ToggleHostOnMessageThread(window);
+        return 0;
+    case kHotkeyCapturedMessage:
+    case kRefreshHotkeyMessage:
+        RefreshHotkeyOnMessageThread(window);
         NotifyUI();
         return 0;
-    }
+    case kRefreshCaptureMessage:
+        RefreshCaptureOnMessageThread(window);
+        return 0;
+    case WM_CLOSE:
+        DestroyWindow(window);
+        return 0;
     case WM_DESTROY:
         PostQuitMessage(0);
         return 0;
@@ -786,53 +1046,36 @@ void MessageThread() {
     HWND window = CreateWindowExW(0, L"AuvolMouseShare", L"", 0, 0, 0, 0, 0,
                                   HWND_MESSAGE, nullptr, windowClass.hInstance,
                                   nullptr);
-    g_window = window;
-    RAWINPUTDEVICE device = {};
-    device.usUsagePage = HID_USAGE_PAGE_GENERIC;
-    device.usUsage = HID_USAGE_GENERIC_MOUSE;
-    device.dwFlags = RIDEV_INPUTSINK;
-    device.hwndTarget = window;
-    RegisterRawInputDevices(&device, 1, sizeof(device));
-    UINT modifiers = 0;
-    UINT vk = 0;
-    {
-        std::lock_guard<std::mutex> lock(g_mutex);
-        EnsureStateLocked();
-        modifiers = g_hotkeyModifiers;
-        vk = g_hotkeyVk;
+    if (!window) return;
+    g_window.store(window, std::memory_order_release);
+    if (!g_running.load(std::memory_order_acquire)) {
+        DestroyWindow(window);
+        g_window.store(nullptr, std::memory_order_release);
+        return;
     }
-    RegisterHotKey(window, kHotkeyId, modifiers | MOD_NOREPEAT, vk);
-    g_mouseHook = SetWindowsHookExW(WH_MOUSE_LL, MouseHook, nullptr, 0);
+
+    RefreshHotkeyOnMessageThread(window);
+    RefreshCaptureOnMessageThread(window);
     NotifyUI();
     MSG message = {};
-    while (g_running.load(std::memory_order_acquire) && GetMessageW(&message, nullptr, 0, 0)) {
+    while (GetMessageW(&message, nullptr, 0, 0) > 0) {
         TranslateMessage(&message);
         DispatchMessageW(&message);
     }
+
+    DisableCaptureOnMessageThread(window);
     UnregisterHotKey(window, kHotkeyId);
-    if (g_mouseHook) {
-        UnhookWindowsHookEx(g_mouseHook);
-        g_mouseHook = nullptr;
-    }
     if (g_keyboardHook) {
         UnhookWindowsHookEx(g_keyboardHook);
         g_keyboardHook = nullptr;
     }
-    RestoreSystemCursor();
-    if (g_blankCursor) {
-        DestroyCursor(g_blankCursor);
-        g_blankCursor = nullptr;
-    }
-    g_window = nullptr;
-    DestroyWindow(window);
+    g_window.store(nullptr, std::memory_order_release);
+    if (IsWindow(window)) DestroyWindow(window);
 }
 
-void StopMouseShareLocked() {
-    g_running.store(false, std::memory_order_release);
-    const SOCKET socketFD = g_socket.exchange(INVALID_SOCKET,
-                                              std::memory_order_acq_rel);
-    if (socketFD != INVALID_SOCKET) closesocket(socketFD);
-    if (g_window) PostMessageW(g_window, WM_DESTROY, 0, 0);
+void RequestEndpointRestart() {
+    g_endpointGeneration.fetch_add(1, std::memory_order_acq_rel);
+    SetPeerAlive(false);
 }
 
 } // namespace
@@ -851,90 +1094,115 @@ void StartMouseShare(const std::string& peerIP) {
         EnsureStateLocked();
         if (g_running.exchange(true, std::memory_order_acq_rel)) return;
     }
-    RestoreSystemCursor();
+
+    RepairLegacySystemCursor();
+    ResetInjectedInput();
+    g_peerAlive.store(false, std::memory_order_release);
+    g_peerLeaseDeadline.store(0, std::memory_order_release);
+    g_captureActive.store(false, std::memory_order_release);
+    g_captureGeneration.fetch_add(1, std::memory_order_acq_rel);
+    g_eventSessionID = GenerateID();
+    g_eventQueueRead.store(0, std::memory_order_release);
+    g_eventQueueWrite.store(0, std::memory_order_release);
+    g_eventReady = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+
     if (g_udpThread.joinable()) g_udpThread.join();
+    if (g_eventThread.joinable()) g_eventThread.join();
     if (g_messageThread.joinable()) g_messageThread.join();
     g_udpThread = std::thread(UdpThread);
+    if (g_eventReady) g_eventThread = std::thread(EventSenderThread);
     g_messageThread = std::thread(MessageThread);
 }
 
 void SetMouseSharePeer(const std::string& peerIP) {
-    std::lock_guard<std::mutex> lock(g_mutex);
-    g_peerIP = peerIP;
+    bool changed = false;
+    {
+        std::lock_guard<std::mutex> lock(g_mutex);
+        changed = g_peerIP != peerIP;
+        g_peerIP = peerIP;
+    }
+    if (changed) RequestEndpointRestart();
 }
 
 void SetMouseShareEndpoint(const std::string& peerIP, const std::string& localIP) {
-    std::lock_guard<std::mutex> lock(g_mutex);
-    g_peerIP = peerIP;
-    g_localIP = localIP;
+    bool changed = false;
+    {
+        std::lock_guard<std::mutex> lock(g_mutex);
+        changed = g_peerIP != peerIP || g_localIP != localIP;
+        g_peerIP = peerIP;
+        g_localIP = localIP;
+    }
+    if (changed) RequestEndpointRestart();
 }
 
 void SetMouseShareEnabled(bool enabled) {
+    bool resetInput = false;
     {
         std::lock_guard<std::mutex> lock(g_mutex);
         EnsureStateLocked();
         if (g_winner.enabled == enabled) return;
         g_winner.enabled = enabled;
         PublishLocked();
-        UpdateCursorLocked();
+        resetInput = !enabled || g_winner.host != 0;
     }
+    if (resetInput) ResetInjectedInput();
+    PostCaptureRefresh();
     NotifyUI();
 }
 
 void SetMouseCursorHost(int host) {
     const UINT8 normalized = host == 1 ? 1 : 0;
+    bool resetInput = false;
     {
         std::lock_guard<std::mutex> lock(g_mutex);
         EnsureStateLocked();
         if (g_winner.host == normalized) return;
         g_winner.host = normalized;
         PublishLocked();
-        UpdateCursorLocked();
+        resetInput = normalized != 0;
     }
+    if (resetInput) ResetInjectedInput();
+    PostCaptureRefresh();
     NotifyUI();
 }
 
 void BeginMouseHotkeyCapture() {
-    {
-        std::lock_guard<std::mutex> lock(g_mutex);
-        g_capturingHotkey = true;
-    }
-    if (g_window) UnregisterHotKey(g_window, kHotkeyId);
-    if (!g_keyboardHook) {
-        g_keyboardHook = SetWindowsHookExW(WH_KEYBOARD_LL, KeyboardHook, nullptr, 0);
+    g_capturingHotkey.store(true, std::memory_order_release);
+    if (HWND window = g_window.load(std::memory_order_acquire)) {
+        PostMessageW(window, kRefreshHotkeyMessage, 0, 0);
     }
     NotifyUI();
 }
 
 void CancelMouseHotkeyCapture() {
-    {
-        std::lock_guard<std::mutex> lock(g_mutex);
-        g_capturingHotkey = false;
+    g_capturingHotkey.store(false, std::memory_order_release);
+    if (HWND window = g_window.load(std::memory_order_acquire)) {
+        PostMessageW(window, kRefreshHotkeyMessage, 0, 0);
     }
-    if (g_keyboardHook) {
-        UnhookWindowsHookEx(g_keyboardHook);
-        g_keyboardHook = nullptr;
-    }
-    UINT modifiers = 0;
-    UINT vk = 0;
-    {
-        std::lock_guard<std::mutex> lock(g_mutex);
-        modifiers = g_hotkeyModifiers;
-        vk = g_hotkeyVk;
-    }
-    if (g_window) RegisterHotKey(g_window, kHotkeyId, modifiers | MOD_NOREPEAT, vk);
     NotifyUI();
 }
 
-} // namespace auvol
-
-namespace auvol {
-
 void StopMouseShare() {
-    StopMouseShareLocked();
-    if (g_udpThread.joinable()) g_udpThread.join();
+    g_running.store(false, std::memory_order_release);
+    g_captureActive.store(false, std::memory_order_release);
+    g_captureGeneration.fetch_add(1, std::memory_order_acq_rel);
+    if (g_eventReady) SetEvent(g_eventReady);
+    const SOCKET socketFD = g_socket.exchange(INVALID_SOCKET,
+                                              std::memory_order_acq_rel);
+    if (socketFD != INVALID_SOCKET) closesocket(socketFD);
+    if (HWND window = g_window.load(std::memory_order_acquire)) {
+        PostMessageW(window, WM_CLOSE, 0, 0);
+    }
+
     if (g_messageThread.joinable()) g_messageThread.join();
-    RestoreSystemCursor();
+    if (g_eventThread.joinable()) g_eventThread.join();
+    if (g_udpThread.joinable()) g_udpThread.join();
+    if (g_eventReady) {
+        CloseHandle(g_eventReady);
+        g_eventReady = nullptr;
+    }
+    SetPeerAlive(false);
+    ResetInjectedInput();
 }
 
 } // namespace auvol

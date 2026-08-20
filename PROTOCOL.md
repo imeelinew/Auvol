@@ -115,8 +115,11 @@ session still shares the mouse.
 ### State packet
 
 Exactly 24 bytes. The consensus rules match ALC1: Lamport `(version,
-origin_id)`, set/ack, five-second heartbeat acknowledgements, and retries
+origin_id)`, set/ack, 500-millisecond heartbeat acknowledgements, and retries
 until acknowledgement. A local change on either computer updates both peers.
+The heartbeat is also a capture safety lease: a computer must not suppress its
+local mouse unless it has received a valid packet from the configured peer in
+the previous 1.5 seconds.
 
 | Offset | Size | Field | Description |
 |---:|---:|---|---|
@@ -129,10 +132,12 @@ until acknowledgement. A local change on either computer updates both peers.
 
 ### Event packet
 
-Exactly 20 bytes. Sent only by the computer that currently sees a physical
+Exactly 28 bytes. Sent only by the computer that currently sees a physical
 (non-injected) mouse while the cursor host is the other computer. The cursor
 host injects immediately. There is no jitter buffer. Stale packets are dropped
-by sequence. Button state is a bitmask so a lost packet is healed by the next.
+by `(session_id, sequence)`. A new random session ID on every process launch
+allows sequence numbers to restart without making all subsequent input look
+stale. Button state is a bitmask so a lost packet is healed by the next.
 
 | Offset | Size | Field | Description |
 |---:|---:|---|---|
@@ -145,3 +150,4 @@ by sequence. Button state is a bitmask so a lost packet is healed by the next.
 | 12 | 2 | wheel | Signed vertical wheel, 120 units per notch |
 | 14 | 2 | hwheel | Signed horizontal wheel, 120 units per notch |
 | 16 | 4 | sequence | Increments once per event datagram |
+| 20 | 8 | session_id | Random non-zero ID generated for this process launch |

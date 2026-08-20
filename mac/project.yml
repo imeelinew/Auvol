@@ -16,8 +16,8 @@ settings:
     CURRENT_PROJECT_VERSION: "1"
     PRODUCT_BUNDLE_IDENTIFIER: com.eli.Auvol
     PRODUCT_NAME: Auvol
-    DEVELOPMENT_TEAM: ""
-    CODE_SIGN_IDENTITY: "-"
+    DEVELOPMENT_TEAM: 5Q5QT76MJU
+    CODE_SIGN_IDENTITY: "Apple Development"
     CODE_SIGN_STYLE: Automatic
 
 targets:
