@@ -5,20 +5,15 @@
 <h1 align="center">Auvol</h1>
 
 <p align="center">
-  通过局域网在 Windows 与 Mac 之间传输系统音频。<br>
-  低延迟、无压缩 PCM、双向可选，以及两端原生界面。
+  Stream system audio between Windows and Mac over your LAN.<br>
+  Low latency, uncompressed PCM, either direction, and native apps on both sides.
 </p>
 
 
 <p align="center">
-  <a href="https://github.com/imeelinew/Auvol/releases">下载</a> ·
-  <a href="#安装">安装</a> ·
-  <a href="#从源码构建">从源码构建</a>
-</p>
-
-<p align="center">
-  <a href="README.md">简体中文</a>
-  <a href="README.en.md">English</a>
+  <a href="https://github.com/imeelinew/Auvol/releases">Download</a> ·
+  <a href="#install">Install</a> ·
+  <a href="#build-from-source">Build from source</a>
 </p>
 
 <p align="center">
@@ -33,94 +28,97 @@
 ---
 
 <p align="center">
-  <img alt="Auvol macOS 窗口" src=".github/assets/macos.png" width="420">
+  <img alt="Auvol macOS window" src=".github/assets/macos.png" width="420">
 </p>
 
-## 简介
+## About
 
-Auvol 是一个面向局域网的系统音频传输工具，适合那些希望把 Windows 上的声音实时送到 Mac 耳机里播放、或者反过来把 Mac 音频送到 Windows 输出设备的人。
+Auvol is a LAN system-audio transport for people who want Windows sound on Mac headphones in real time, or Mac audio played through a Windows output device.
 
-Mac 端以原生窗口呈现连接状态、传输方向、缓冲目标，以及当前缓冲、输出周期、时钟校正、源周期等实时指标；你也可以看到播放设备、信号电平和丢包统计。它在同一时刻只走一个方向：Windows → Mac，或 Mac → Windows。传输路径里没有编解码器，直接发送立体声 float32 PCM；稳态 48 kHz 时，唯一的采样率处理是两端物理时钟之间那一点点校正。
+The Mac app shows connection state, direction, buffer target, and live metrics such as current buffer, output period, clock correction, and source period, plus playback device, signal level, and packet stats. Exactly one direction is active at a time: Windows → Mac or Mac → Windows. There is no codec in the path—only stereo float32 PCM. During a stable 48 kHz stream, the only sample-rate work is the tiny clock correction required because two physical audio devices never run at exactly the same rate.
 
-## 为什么开发 Auvol
+## Why Auvol
 
-跨设备听系统声音通常要靠蓝牙、HDMI，或者带压缩的远程桌面 / 投屏方案。Auvol 把它做成一条专门的局域网音频链路：一端采集系统输出，另一端送到默认播放设备，并尽量把延迟压在毫秒级。
+Cross-device system audio usually means Bluetooth, HDMI, or a compressed remote-desktop / screen-share path. Auvol turns that into a dedicated LAN audio link: one side captures system output, the other plays to the default device, with latency kept in the millisecond range when the network allows.
 
-- **局域网优先**：面向千兆有线或稳定 Wi‑Fi，用 UDP 运送原始 PCM。
-- **双向可选**：同一套应用同时覆盖发送与接收，运行中可切换方向。
-- **无压缩音质**：ALV2 协议传输 48 kHz 双声道 float32，不经过有损编码。
-- **两端原生界面**：macOS 原生窗口 + Windows WinUI 3，状态与控制都放在本机 UI 里。
-- **可观测的链路**：缓冲目标、时钟校正、丢包 / 迟到、欠载与溢出都直接可见，方便把延迟调到刚好够稳。
+- **LAN first**: raw PCM over UDP on gigabit Ethernet or solid Wi‑Fi.
+- **Either direction**: the same apps cover send and receive; switch roles while running.
+- **Uncompressed quality**: ALV2 carries 48 kHz stereo float32 with no lossy encode.
+- **Native on both sides**: a native macOS window and a WinUI 3 Windows app keep status and controls local.
+- **Observable link**: buffer target, clock correction, lost / late packets, underruns, and overflows stay visible so you can tune latency to the lowest stable point.
 
 ## Windows
 
 <p align="center">
-  <img alt="Auvol Windows 窗口" src=".github/assets/windows.png" width="520">
+  <img alt="Auvol Windows window" src=".github/assets/windows.png" width="520">
 </p>
 
-Windows 端用 WinUI 3 提供对端 IP、连接状态、传输方向和开始 / 停止控制。发送时通过 WASAPI 环回采集当前默认输出；接收时则播放到当前默认输出设备。
+The Windows app uses WinUI 3 for peer IP, connection status, direction, and start / stop. Send mode captures the current default output via WASAPI loopback; receive mode plays to the current default output device.
 
-## 选择传输方向
+## Select a direction
 
-在 Windows 上选好角色后按一次 **开始**。链路运行期间切换方向会立刻换角色，不必先停止。
+On Windows, choose a role and press **Start** once. Changing direction while Auvol is running switches roles immediately—no need to stop first.
 
-- **Windows → Mac**：采集 Windows 当前默认输出，送到 Mac 播放。
-- **Mac → Windows**：采集 Mac 系统音频，送到 Windows 当前默认输出；若要用蓝牙耳机，请先在 Windows 声音设置里选好设备。
+- **Windows → Mac**: capture the current Windows default output and play it on Mac.
+- **Mac → Windows**: capture Mac system audio and play it on the current Windows default output; pick the Bluetooth headset in Windows sound settings first if needed.
 
-在 Mac 上选择 **从 Windows 接收** 或 **发送到 Windows**。Mac 发送需要一次性授权系统音频采集。
+On Mac, choose **Receive from Windows** or **Send to Windows**. Mac send requires a one-time system-audio capture permission.
 
-### 自动跟随耳机
+### Follow headphones automatically
 
-两端都可以启用 **自动跟随指定耳机**。先让耳机成为当前电脑的默认
-输出，再选择“使用当前输出”：
+Both apps can enable **Follow selected headphones automatically**. First make
+the headphones the current computer's default output, then choose “Use current
+output”:
 
-- 指定耳机成为 Mac 默认输出时，方向自动切换为 Windows → Mac。
-- 指定耳机成为 Windows 默认输出时，方向自动切换为 Mac → Windows。
-- 耳机只从一端断开时不会猜测性反转；Auvol 会等待另一端稳定地把它
-  设为默认输出。
-- 默认输出需要稳定一秒才会触发认领，避免蓝牙重连时的临时设备状态
-  引发来回切换。
-- 手动方向选择会立即生效，直到下一次真实的耳机输出切换。暂停状态
-  只更新所选方向，不会自动开始传输。
+- When the selected headphones become the Mac default output, Auvol switches to
+  Windows → Mac.
+- When they become the Windows default output, Auvol switches to Mac → Windows.
+- A disconnect alone never guesses the opposite direction. Auvol waits until
+  the other computer has made the headphones its stable default output.
+- The output must remain stable for one second, filtering transient devices
+  exposed during Bluetooth reconnects.
+- A manual direction selection takes effect immediately and remains until the
+  next real headphone route change. Paused transport updates its selected
+  direction without starting.
 
-无人值守启动可用：
+For unattended Windows launch:
 
 ```sh
 Auvol.exe --send <mac-ip>
 Auvol.exe --receive <mac-ip>
 ```
 
-Windows 会记住对端 IP、方向，以及传输是否处于运行中。首次启动之后，下次登录可自动拉起并恢复进行中的会话；按停止或关闭窗口会记为暂停，下次登录则空闲打开。
+Windows remembers the peer IP, selected direction, and whether transport was running. After the first launch, it can start at the next sign-in and resume an active session. Stop or closing the window records a paused state, so the next sign-in opens Auvol idle.
 
-## 其他功能
+## More features
 
-- 半双工实时传输：同一时刻只选一个方向
-- ALV2 原始立体声 float32 PCM，带流身份、序号与发送端帧位置
-- 默认约 12 ms 抖动缓冲目标，可按链路质量微调
-- 默认音频设备变化、蓝牙断开、短暂 WASAPI / Core Audio 故障时自动恢复
-- Mac 侧展示排队深度、时钟校正、丢包、欠载与溢出等关键队列时序
-- Start / Stop 是全局暂停控制，不是故障恢复流程
+- Half-duplex real-time transport: exactly one direction at a time
+- ALV2 raw stereo float32 PCM with stream identity, packet sequence, and sender frame positions
+- Default jitter target around 12 ms, tunable to the link
+- Automatic recovery from default-device changes, Bluetooth disconnects, and brief WASAPI / Core Audio failures
+- Mac UI exposes queue depth, clock correction, loss, underrun, and overflow timing
+- Start / Stop is a global pause control, not a recovery procedure
 
-## 安装
+## Install
 
-从 [Releases 页面](https://github.com/imeelinew/Auvol/releases)下载最新版，分别安装 macOS 与 Windows 客户端后，在同一局域网内填入对端 IP 并选择传输方向即可。
+Download the latest build from the [Releases page](https://github.com/imeelinew/Auvol/releases), install the macOS and Windows clients, then enter the peer IP on the same LAN and pick a direction.
 
-## 从源码构建
+## Build from source
 
-`deploy.sh` 会重新生成 Xcode 工程、构建两端应用，把 WinUI 应用安装到 `%LOCALAPPDATA%\Auvol`，并重启两端。Windows 源码工作区会同步到 `C:\dev\Auvol\windows`，再用 Visual Studio 的 x64 C++ 工具链构建。
+`deploy.sh` regenerates the Xcode project, builds both apps, installs the WinUI app under `%LOCALAPPDATA%\Auvol`, and restarts both sides. The Windows source workspace is synchronized to `C:\dev\Auvol\windows` and built with Visual Studio's x64 C++ toolchain.
 
 ```sh
-# 同一局域网：推荐
+# Same LAN: preferred
 WIN_HOST=eli-lan ./deploy.sh
 
-# 通过 Surge Tailscale 远程部署
+# Remote through Surge Tailscale
 ./deploy.sh
 ```
 
-部署完成后，新的 Windows 应用会自动启动。日常使用中，设备切换与短暂音频故障会自动恢复。ALV1 与 ALV2 故意不兼容。
+After deployment, the new Windows app launches automatically. During normal use, device changes and brief audio failures recover automatically. ALV1 and ALV2 are intentionally incompatible.
 
-更细的协议说明见 [`PROTOCOL.md`](PROTOCOL.md)。
+See [`PROTOCOL.md`](PROTOCOL.md) for the wire format.
 
-## 许可
+## License
 
-本项目采用 [MIT License](LICENSE)。
+This project is licensed under the [MIT License](LICENSE).
